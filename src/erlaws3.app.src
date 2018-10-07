@@ -5,7 +5,8 @@
   {mod, { erlaws3_app, []}},
   {applications,
    [kernel,
-    stdlib
+    stdlib,
+    gun
    ]},
   {env,[]},
   {modules, []},
