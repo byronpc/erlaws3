@@ -4,7 +4,9 @@
   get_timestamp/0,
   sha256_to_hex/1,
   http_open/2,
-  http_request/6
+  http_get/4,
+  http_post/5,
+  http_put/5
 ]).
 
 %%====================================================================
@@ -26,8 +28,19 @@ http_open(Url, Port) ->
   {ok, _Protocol} = gun:await_up(ConnPid),
   {ok, ConnPid}.
 
-http_request(ConnPid, Method, Path, Headers, Body, Opts) ->
-  StreamRef = gun:Method(ConnPid, Path, Headers, Body, Opts),
+http_get(ConnPid, Path, Headers, Opts) ->
+  StreamRef = gun:get(ConnPid, Path, Headers, Opts),
+  http_response(ConnPid, StreamRef).
+
+http_post(ConnPid, Path, Headers, Body, Opts) ->
+  StreamRef = gun:post(ConnPid, Path, Headers, Body, Opts),
+  http_response(ConnPid, StreamRef).
+
+http_put(ConnPid, Path, Headers, Body, Opts) ->
+  StreamRef = gun:put(ConnPid, Path, Headers, Body, Opts),
+  http_response(ConnPid, StreamRef).
+
+http_response(ConnPid, StreamRef) ->
   case gun:await(ConnPid, StreamRef) of
     {response, fin, StatusCode, _Headers} ->
       {ok, #{body => <<>>, status_code => StatusCode}};
