@@ -42,13 +42,13 @@ http_put(ConnPid, Path, Headers, Body, Opts) ->
 
 http_response(ConnPid, StreamRef) ->
   case gun:await(ConnPid, StreamRef) of
-    {response, fin, StatusCode, _Headers} ->
-      {ok, #{body => <<>>, status_code => StatusCode}};
-    {response, nofin, StatusCode, _Headers} ->
+    {response, fin, StatusCode, Headers} ->
+      {ok, #{status_code => StatusCode, headers => Headers, body => <<>>}};
+    {response, nofin, StatusCode, Headers} ->
       case gun:await_body(ConnPid, StreamRef) of
         {ok, Resp} ->
           {ok, Xml} = exml:parse(Resp),
-          {ok, #{body => Xml, status_code => StatusCode}};
+          {ok, #{status_code => StatusCode, headers => Headers, body => Xml}};
         E ->
           E
       end;
