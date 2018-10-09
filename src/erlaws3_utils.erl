@@ -1,3 +1,8 @@
+%%%-------------------------------------------------------------------
+%% @doc Utilities
+%% @author Byron Wang <byronpc1@gmail.com>
+%% @end
+%%%-------------------------------------------------------------------
 -module(erlaws3_utils).
 -export([
   get_date/0,
@@ -11,7 +16,7 @@
 ]).
 
 %%====================================================================
-%% Utilities
+%% @doc Utilities
 %%====================================================================
 get_date() ->
   {Y,M,D} = date(),
@@ -25,9 +30,14 @@ sha256_to_hex(<<Bin:256/big-unsigned-integer>>) ->
   lists:flatten(io_lib:format("~64.16.0b", [Bin])).
 
 http_open(Url, Port) ->
-  {ok, ConnPid} = gun:open(Url, Port),
-  {ok, _Protocol} = gun:await_up(ConnPid),
-  {ok, ConnPid}.
+  case gun:open(Url, Port) of
+    {ok, ConnPid} ->
+      case gun:await_up(ConnPid) of
+        {ok, _Protocol} -> {ok, ConnPid};
+        E -> E
+      end;
+    E2 -> E2
+  end.
 
 http_close(ConnPid) ->
   gun:close(ConnPid).
@@ -45,11 +55,11 @@ http_put(ConnPid, Path, Headers, Payload, Opts) ->
   http_response(ConnPid, StreamRef).
 
 http_response(ConnPid, StreamRef) ->
-  case gun:await(ConnPid, StreamRef) of
+  case catch gun:await(ConnPid, StreamRef) of
     {response, fin, StatusCode, Headers} ->
       {ok, #{status_code => StatusCode, headers => Headers, body => <<>>}};
     {response, nofin, StatusCode, Headers} ->
-      case gun:await_body(ConnPid, StreamRef) of
+      case catch gun:await_body(ConnPid, StreamRef) of
         {ok, Body} ->
           {ok, Xml} = exml:parse(Body),
           {ok, #{status_code => StatusCode, headers => Headers, body => Xml}};

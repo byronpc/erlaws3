@@ -1,5 +1,6 @@
 %%%-------------------------------------------------------------------
 %% @doc Header Generator for AWS Signature Version 4 (Unsigned Payload)
+%% @author Byron Wang <byronpc1@gmail.com>
 %% @end
 %%%-------------------------------------------------------------------
 -module(erlaws3_headers).
@@ -8,7 +9,7 @@
 -define(PAYLOAD_HASH, "UNSIGNED-PAYLOAD").
 
 %%====================================================================
-%% Header Generator
+%% @doc Header Generator
 %%====================================================================
 generate(Host, HttpVerb, CanonicalUri, CanonicalQueryString, AwsRegion, Scope) ->
   Date = erlaws3_utils:get_date(),
@@ -29,7 +30,7 @@ generate(Host, HttpVerb, CanonicalUri, CanonicalQueryString, AwsRegion, Scope) -
   ].
 
 %%====================================================================
-%% Signature
+%% @doc Signature
 %%====================================================================
 generate_signature(HttpVerb, CanonicalUri, CanonicalQueryString, Headers, AwsRegion, Scope, Date, Timestamp) ->
   CanonicalRequest = generate_canonical_request(HttpVerb, CanonicalUri, CanonicalQueryString, Headers),
@@ -38,7 +39,7 @@ generate_signature(HttpVerb, CanonicalUri, CanonicalQueryString, Headers, AwsReg
   erlaws3_utils:sha256_to_hex(crypto:hmac(sha256, SigningKey, StringToSign)).
 
 %%====================================================================
-%% Canonical Request
+%% @doc Canonical Request
 %%====================================================================
 generate_canonical_request(HttpVerb, CanonicalUri, CanonicalQueryString, Headers) ->
   Headers1 = lists:sort(Headers),
@@ -53,7 +54,7 @@ generate_canonical_request(HttpVerb, CanonicalUri, CanonicalQueryString, Headers
   erlaws3_utils:sha256_to_hex(crypto:hash(sha256, CanonicalRequest)).
 
 %%====================================================================
-%% String To Sign
+%% @doc String To Sign
 %%====================================================================
 generate_string_to_sign(Date, Timestamp, AwsRegion, Scope, CanonicalRequest) ->
   string:join([
@@ -63,7 +64,7 @@ generate_string_to_sign(Date, Timestamp, AwsRegion, Scope, CanonicalRequest) ->
     CanonicalRequest], "\n").
 
 %%====================================================================
-%% Signing Key
+%% @doc Signing Key
 %%====================================================================
 generate_signing_key(Date, AwsRegion, Scope) ->
   SecretKey = application:get_env(erlaws3, secret_key, ""),
