@@ -48,7 +48,8 @@ initiate_multipart_upload(ConnPid, BucketUrl, ObjectName, AwsRegion) ->
   case erlaws3_utils:http_post(ConnPid, ObjectName ++ "?" ++ Query, Headers, <<>>, #{}) of
     {ok, #{status_code := 200, body := Xml}} ->
       {ok, binary_to_list(exml_query:cdata(exml_query:subelement(Xml, <<"UploadId">>)))};
-    E -> E % unhandled errors if any
+    {_, Error} ->
+      {error, Error} % unhandled errors if any
   end.
 
 %%====================================================================
@@ -61,24 +62,19 @@ list_parts(ConnPid, BucketUrl, ObjectName, AwsRegion, UploadId) ->
     {ok, #{status_code := 200, body := #xmlel{children = Children}}} ->
       %% initiator/owner keys skipped
       {ok, [{Name, Cdata} || #xmlel{name = Name, children = [{xmlcdata, Cdata}]} <- Children]};
-    E -> E % unhandled errors if any
+    {_, Error} ->
+      {error, Error} % unhandled errors if any
   end.
 
 %%====================================================================
 %% @doc Upload Part
-%% Use upload_part/8 for first part upload to reuse http connection
 %% Use upload_part/6 for succeeding parts to spawn new http connection
 %%====================================================================
 upload_part(BucketUrl, ObjectName, AwsRegion, UploadId, PartNumber, Payload) ->
+  upload_part(BucketUrl, ObjectName, AwsRegion, UploadId, PartNumber, Payload, 0).
+
+upload_part(BucketUrl, ObjectName, AwsRegion, UploadId, PartNumber, Payload, Retry) ->
   {ok, ConnPid} = erlaws3_utils:http_open(BucketUrl, 443),
-  Result = upload_part(ConnPid, BucketUrl, ObjectName, AwsRegion, UploadId, PartNumber, Payload, 0),
-  erlaws3_utils:http_close(ConnPid),
-  Result.
-
-upload_part(ConnPid, BucketUrl, ObjectName, AwsRegion, UploadId, PartNumber, Payload) ->
-  upload_part(ConnPid, BucketUrl, ObjectName, AwsRegion, UploadId, PartNumber, Payload, 0).
-
-upload_part(ConnPid, BucketUrl, ObjectName, AwsRegion, UploadId, PartNumber, Payload, Retry) ->
   MaxRetry = application:get_env(erlaws3, max_retry, 3),
   Query = "partNumber=" ++ integer_to_list(PartNumber) ++ "&uploadId=" ++ UploadId,
   Headers = erlaws3_headers:generate(BucketUrl ++ ":443", "PUT", ObjectName, Query, AwsRegion, ?SCOPE),
@@ -87,13 +83,13 @@ upload_part(ConnPid, BucketUrl, ObjectName, AwsRegion, UploadId, PartNumber, Pay
     {ok, #{status_code := 200, headers := Resp}} ->
       {<<"etag">>, Etag} = lists:keyfind(<<"etag">>, 1, Resp),
       {ok, Etag};
-    {error, Error} ->
+    {_, Error} ->
+      erlaws3_utils:http_close(ConnPid),
       if Retry < MaxRetry ->
-        upload_part(ConnPid, BucketUrl, ObjectName, AwsRegion, UploadId, PartNumber, Payload, Retry + 1);
+        upload_part(BucketUrl, ObjectName, AwsRegion, UploadId, PartNumber, Payload, Retry + 1);
       true ->
         {error, Error}
-      end;
-    E -> E % unhandled errors if any
+      end
   end.
 
 %%====================================================================
@@ -122,5 +118,6 @@ complete_multipart_upload(ConnPid, BucketUrl, ObjectName, AwsRegion, UploadId, P
       true ->
         {ok, [{Name, Cdata} || #xmlel{name = Name, children = [{xmlcdata, Cdata}]} <- Children]}
       end;
-    E -> E % unhandled errors if any
+    {_, Error} ->
+      {error, Error} % unhandled errors if any
   end.

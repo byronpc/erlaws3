@@ -33,7 +33,14 @@ upload(Bucket, AwsRegion, ObjectName, File) ->
           ChunkSize = application:get_env(erlaws3, chunk_size, ?MIN_CHUNK_SIZE),
           Chunks = ceil(FileSize/ChunkSize),
           Parts = upload_chunks(BucketUrl, ObjectName, AwsRegion, UploadId, File, Chunks, ChunkSize),
-          erlaws3_lib:complete_multipart_upload(ConnPid, BucketUrl, ObjectName, AwsRegion, UploadId, Parts);
+
+          % check if all parts are ok
+          case lists:all(fun({R, _Etag}) -> is_integer(R) end, Parts) of
+            true ->
+              erlaws3_lib:complete_multipart_upload(ConnPid, BucketUrl, ObjectName, AwsRegion, UploadId, Parts);
+            false ->
+              {error, lists:filter(fun({R, _Etag}) -> is_atom(R) end, Parts)}
+          end;
 
         % if file is less than 5MB, single upload the file
         _ ->
@@ -49,8 +56,12 @@ upload_chunks(BucketUrl, ObjectName, AwsRegion, UploadId, File, Chunks, ChunkSiz
   % open file
   {ok, Fid} = file:open(File, [read]),
   Pids = [ spawn_link(fun() ->
-    {ok, Payload} = file:pread(Fid, [{((PartNumber-1)*ChunkSize), ChunkSize}]),
-    {ok, Etag} = erlaws3_lib:upload_part(BucketUrl, ObjectName, AwsRegion, UploadId, PartNumber, Payload),
-    Caller ! {self(), {PartNumber, Etag}}
+    StartingPoint = (PartNumber - 1) * ChunkSize,
+    {ok, Payload} = file:pread(Fid, [{StartingPoint, ChunkSize}]),
+    Result = case erlaws3_lib:upload_part(BucketUrl, ObjectName, AwsRegion, UploadId, PartNumber, Payload) of
+      {ok, Etag} -> {PartNumber, Etag};
+      E -> E
+    end,
+    Caller ! {self(), Result}
   end) || PartNumber <- lists:seq(1, Chunks)],
   [ receive {Pid, R} -> R end || Pid <- Pids ].
