@@ -1,4 +1,4 @@
 erlaws3
 =======
 
-A simple AWS S3 multipart upload tool for Erlang
+AWS S3 multipart upload tool for Erlang using AWS Signature v4
