@@ -13,9 +13,6 @@
 -define(BUCKET_URL(Bucket), Bucket ++ ".s3.amazonaws.com").
 -define(MIN_CHUNK_SIZE, 5242880). % S3 Minumum Size for Multipart Upload
 
-upload() ->
-  upload("erlaws3", "ap-southeast-1", "/pic2.jpg", "/mnt/c/Users/byron/Documents/erlaws3/pic.jpg").
-
 %%====================================================================
 %% @doc Upload File
 %% upload("bucket", "region", "/sample_file", "file_path")
