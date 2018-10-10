@@ -1,12 +1,12 @@
-# erlaws3: AWS S3 multipart upload tool for Erlang #
+# erlaws3: AWS s3 multipart upload tool for erlang #
 
-An AWS S3 multipart upload tool utilizing AWS Signature v4.
+An AWS s3 multipart upload tool utilizing AWS Signature v4 with automatic retry mechanism in case of single or part upload failure.
 
 ## Config ##
 
 Make sure to define your access/secret keys in the AWS config
 
-```
+```erlang
 {erlaws3, [
 
   %% AWS keys
@@ -33,7 +33,7 @@ Make sure to define your access/secret keys in the AWS config
 
 If file size is less than 5MB, file will be uploaded via regular PUT operation
 
-```
+```erlang
 1> erlaws3:upload("bucket", "region", "/sample_file", "file_path")
 {ok,<<"\"upload_etag\"">>}
 ```
