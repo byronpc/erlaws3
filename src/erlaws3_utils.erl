@@ -12,7 +12,8 @@
   http_close/1,
   http_get/4,
   http_post/5,
-  http_put/5
+  http_put/5,
+  http_delete/4
 ]).
 
 %%====================================================================
@@ -52,6 +53,10 @@ http_post(ConnPid, Path, Headers, Payload, Opts) ->
 
 http_put(ConnPid, Path, Headers, Payload, Opts) ->
   StreamRef = gun:put(ConnPid, Path, Headers, Payload, Opts),
+  http_response(ConnPid, StreamRef).
+
+http_delete(ConnPid, Path, Headers, Opts) ->
+  StreamRef = gun:delete(ConnPid, Path, Headers, Opts),
   http_response(ConnPid, StreamRef).
 
 http_response(ConnPid, StreamRef) ->

@@ -10,7 +10,8 @@
   list_parts/5,
   upload_part/6,
   upload_part/7,
-  complete_multipart_upload/6
+  complete_multipart_upload/6,
+  abort_multipart_upload/5
 ]).
 
 -include_lib("exml/include/exml.hrl").
@@ -96,10 +97,6 @@ upload_part(BucketUrl, ObjectName, AwsRegion, UploadId, PartNumber, Payload, Ret
 %% @doc Complete Multipart Upload Part
 %%====================================================================
 complete_multipart_upload(ConnPid, BucketUrl, ObjectName, AwsRegion, UploadId, Parts) ->
-  complete_multipart_upload(ConnPid, BucketUrl, ObjectName, AwsRegion, UploadId, Parts, 0).
-
-complete_multipart_upload(ConnPid, BucketUrl, ObjectName, AwsRegion, UploadId, Parts, Retry) ->
-  MaxRetry = application:get_env(erlaws3, max_retry, 3),
   Query = "uploadId=" ++ UploadId,
   Headers = erlaws3_headers:generate(BucketUrl ++ ":443", "POST", ObjectName, Query, AwsRegion, ?SCOPE),
   PartsXml = [
@@ -113,11 +110,20 @@ complete_multipart_upload(ConnPid, BucketUrl, ObjectName, AwsRegion, UploadId, P
     {ok, #{body := #xmlel{name = <<"CompleteMultipartUploadResult">>} = Xml}} ->
       {ok, exml_query:cdata(exml_query:subelement(Xml, <<"ETag">>))};
     {ok, #{body := #xmlel{name = <<"Error">>, children = Children}}} ->
-      if Retry < MaxRetry ->
-        complete_multipart_upload(ConnPid, BucketUrl, ObjectName, AwsRegion, UploadId, Parts, Retry + 1);
-      true ->
-        {ok, [{Name, Cdata} || #xmlel{name = Name, children = [{xmlcdata, Cdata}]} <- Children]}
-      end;
+      {error, [{Name, Cdata} || #xmlel{name = Name, children = [{xmlcdata, Cdata}]} <- Children]};
+    {_, Error} ->
+      {error, Error} % unhandled errors if any
+  end.
+
+abort_multipart_upload(ConnPid, BucketUrl, ObjectName, AwsRegion, UploadId) ->
+  Query = "uploadId=" ++ UploadId,
+  Headers = erlaws3_headers:generate(BucketUrl ++ ":443", "DELETE", ObjectName, Query, AwsRegion, ?SCOPE),
+
+  case erlaws3_utils:http_delete(ConnPid, ObjectName ++ "?" ++ Query, Headers, #{}) of
+    {ok, #{status_code := 204}} ->
+      {ok, true};
+    {ok, #{status_code := 404}} ->
+      {error, no_such_upload};
     {_, Error} ->
       {error, Error} % unhandled errors if any
   end.
