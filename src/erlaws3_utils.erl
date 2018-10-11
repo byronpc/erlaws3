@@ -10,10 +10,10 @@
   sha256_to_hex/1,
   http_open/2,
   http_close/1,
-  http_get/4,
-  http_post/5,
-  http_put/5,
-  http_delete/4
+  http_get/3,
+  http_post/4,
+  http_put/4,
+  http_delete/3
 ]).
 
 %%====================================================================
@@ -31,46 +31,32 @@ sha256_to_hex(<<Bin:256/big-unsigned-integer>>) ->
   lists:flatten(io_lib:format("~64.16.0b", [Bin])).
 
 http_open(Url, Port) ->
-  case gun:open(Url, Port) of
-    {ok, ConnPid} ->
-      case gun:await_up(ConnPid) of
-        {ok, _Protocol} -> {ok, ConnPid};
-        E -> E
-      end;
-    E2 -> E2
-  end.
+  hackney:connect(hackney_ssl, Url, Port).
 
 http_close(ConnPid) ->
-  gun:close(ConnPid).
+  hackney:close(ConnPid).
 
-http_get(ConnPid, Path, Headers, Opts) ->
-  StreamRef = gun:get(ConnPid, Path, Headers, Opts),
-  http_response(ConnPid, StreamRef).
+http_get(ConnPid, Path, Headers) ->
+  http_request(ConnPid, get, Path, Headers, <<>>).
 
-http_post(ConnPid, Path, Headers, Payload, Opts) ->
-  StreamRef = gun:post(ConnPid, Path, Headers, Payload, Opts),
-  http_response(ConnPid, StreamRef).
+http_post(ConnPid, Path, Headers, Payload) ->
+  http_request(ConnPid, post, Path, Headers, Payload).
 
-http_put(ConnPid, Path, Headers, Payload, Opts) ->
-  StreamRef = gun:put(ConnPid, Path, Headers, Payload, Opts),
-  http_response(ConnPid, StreamRef).
+http_put(ConnPid, Path, Headers, Payload) ->
+  http_request(ConnPid, put, Path, Headers, Payload).
 
-http_delete(ConnPid, Path, Headers, Opts) ->
-  StreamRef = gun:delete(ConnPid, Path, Headers, Opts),
-  http_response(ConnPid, StreamRef).
+http_delete(ConnPid, Path, Headers) ->
+  http_request(ConnPid, delete, Path, Headers, <<>>).
 
-http_response(ConnPid, StreamRef) ->
-  case catch gun:await(ConnPid, StreamRef) of
-    {response, fin, StatusCode, Headers} ->
-      {ok, #{status_code => StatusCode, headers => Headers, body => <<>>}};
-    {response, nofin, StatusCode, Headers} ->
-      case catch gun:await_body(ConnPid, StreamRef) of
-        {ok, Body} ->
-          {ok, Xml} = exml:parse(Body),
-          {ok, #{status_code => StatusCode, headers => Headers, body => Xml}};
-        E ->
-          E
-      end;
-    E2 ->
-      E2
+http_request(ConnPid, Method, Path, Headers, Payload) ->
+  case hackney:send_request(ConnPid, {Method, list_to_binary(Path), Headers, Payload}) of
+    {ok, StatusCode, RespHeaders, _Ref} ->
+      {ok, Body} = hackney:body(ConnPid),
+      Resp = case exml:parse(Body) of
+        {ok, Xml} -> Xml;
+        _ -> Body
+      end,
+      {ok, #{status_code => StatusCode, headers => RespHeaders, body => Resp}};
+    E ->
+      E
   end.

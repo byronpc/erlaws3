@@ -25,11 +25,11 @@ single_upload(ConnPid, BucketUrl, ObjectName, AwsRegion, Payload) ->
 
 single_upload(ConnPid, BucketUrl, ObjectName, AwsRegion, Payload, Retry) ->
   MaxRetry = application:get_env(erlaws3, max_retry, 3),
-  Headers = erlaws3_headers:generate(BucketUrl ++ ":443", "PUT", ObjectName, "", AwsRegion, ?SCOPE),
-  Result = erlaws3_utils:http_put(ConnPid, ObjectName, Headers, Payload, #{}),
+  Headers = erlaws3_headers:generate(BucketUrl, "PUT", ObjectName, "", AwsRegion, ?SCOPE),
+  Result = erlaws3_utils:http_put(ConnPid, ObjectName, Headers, Payload),
   case Result of
-    {ok, #{status_code := 200, headers := Resp, body := Body}} ->
-      {<<"etag">>, Etag} = lists:keyfind(<<"etag">>, 1, Resp),
+    {ok, #{status_code := 200, headers := Resp}} ->
+      {<<"ETag">>, Etag} = lists:keyfind(<<"ETag">>, 1, Resp),
       {ok, Etag};
     {error, Error} ->
       if Retry < MaxRetry ->
@@ -45,8 +45,8 @@ single_upload(ConnPid, BucketUrl, ObjectName, AwsRegion, Payload, Retry) ->
 %%====================================================================
 initiate_multipart_upload(ConnPid, BucketUrl, ObjectName, AwsRegion) ->
   Query = "uploads=",
-  Headers = erlaws3_headers:generate(BucketUrl ++ ":443", "POST", ObjectName, Query, AwsRegion, ?SCOPE),
-  case erlaws3_utils:http_post(ConnPid, ObjectName ++ "?" ++ Query, Headers, <<>>, #{}) of
+  Headers = erlaws3_headers:generate(BucketUrl, "POST", ObjectName, Query, AwsRegion, ?SCOPE),
+  case erlaws3_utils:http_post(ConnPid, ObjectName ++ "?" ++ Query, Headers, <<>>) of
     {ok, #{status_code := 200, body := Xml}} ->
       {ok, binary_to_list(exml_query:cdata(exml_query:subelement(Xml, <<"UploadId">>)))};
     {_, Error} ->
@@ -58,8 +58,8 @@ initiate_multipart_upload(ConnPid, BucketUrl, ObjectName, AwsRegion) ->
 %%====================================================================
 list_parts(ConnPid, BucketUrl, ObjectName, AwsRegion, UploadId) ->
   Query = "uploadId=" ++ UploadId,
-  Headers = erlaws3_headers:generate(BucketUrl ++ ":443", "GET", ObjectName, Query, AwsRegion, ?SCOPE),
-  case erlaws3_utils:http_get(ConnPid, ObjectName ++ "?" ++ Query, Headers, #{}) of
+  Headers = erlaws3_headers:generate(BucketUrl, "GET", ObjectName, Query, AwsRegion, ?SCOPE),
+  case erlaws3_utils:http_get(ConnPid, ObjectName ++ "?" ++ Query, Headers) of
     {ok, #{status_code := 200, body := #xmlel{children = Children}}} ->
       %% initiator/owner keys skipped
       {ok, [{Name, Cdata} || #xmlel{name = Name, children = [{xmlcdata, Cdata}]} <- Children]};
@@ -78,11 +78,11 @@ upload_part(BucketUrl, ObjectName, AwsRegion, UploadId, PartNumber, Payload, Ret
   {ok, ConnPid} = erlaws3_utils:http_open(BucketUrl, 443),
   MaxRetry = application:get_env(erlaws3, max_retry, 3),
   Query = "partNumber=" ++ integer_to_list(PartNumber) ++ "&uploadId=" ++ UploadId,
-  Headers = erlaws3_headers:generate(BucketUrl ++ ":443", "PUT", ObjectName, Query, AwsRegion, ?SCOPE),
-  Result = erlaws3_utils:http_put(ConnPid, ObjectName ++ "?" ++ Query, Headers, Payload, #{}),
+  Headers = erlaws3_headers:generate(BucketUrl, "PUT", ObjectName, Query, AwsRegion, ?SCOPE),
+  Result = erlaws3_utils:http_put(ConnPid, ObjectName ++ "?" ++ Query, Headers, Payload),
   case Result of
     {ok, #{status_code := 200, headers := Resp}} ->
-      {<<"etag">>, Etag} = lists:keyfind(<<"etag">>, 1, Resp),
+      {<<"ETag">>, Etag} = lists:keyfind(<<"ETag">>, 1, Resp),
       {ok, Etag};
     {_, Error} ->
       erlaws3_utils:http_close(ConnPid),
@@ -98,7 +98,7 @@ upload_part(BucketUrl, ObjectName, AwsRegion, UploadId, PartNumber, Payload, Ret
 %%====================================================================
 complete_multipart_upload(ConnPid, BucketUrl, ObjectName, AwsRegion, UploadId, Parts) ->
   Query = "uploadId=" ++ UploadId,
-  Headers = erlaws3_headers:generate(BucketUrl ++ ":443", "POST", ObjectName, Query, AwsRegion, ?SCOPE),
+  Headers = erlaws3_headers:generate(BucketUrl, "POST", ObjectName, Query, AwsRegion, ?SCOPE),
   PartsXml = [
     #xmlel{name = <<"Part">>, children = [
       #xmlel{name = <<"PartNumber">>, children = [{xmlcdata, integer_to_binary(PartNumber)}]},
@@ -106,7 +106,7 @@ complete_multipart_upload(ConnPid, BucketUrl, ObjectName, AwsRegion, UploadId, P
     ]}
   || {PartNumber, Etag} <- Parts],
   Payload = exml:to_binary(#xmlel{name = <<"CompleteMultipartUpload">>, children = PartsXml}),
-  case erlaws3_utils:http_post(ConnPid, ObjectName ++ "?" ++ Query, Headers, Payload, #{}) of
+  case erlaws3_utils:http_post(ConnPid, ObjectName ++ "?" ++ Query, Headers, Payload) of
     {ok, #{body := #xmlel{name = <<"CompleteMultipartUploadResult">>} = Xml}} ->
       {ok, exml_query:cdata(exml_query:subelement(Xml, <<"ETag">>))};
     {ok, #{body := #xmlel{name = <<"Error">>, children = Children}}} ->
@@ -117,9 +117,9 @@ complete_multipart_upload(ConnPid, BucketUrl, ObjectName, AwsRegion, UploadId, P
 
 abort_multipart_upload(ConnPid, BucketUrl, ObjectName, AwsRegion, UploadId) ->
   Query = "uploadId=" ++ UploadId,
-  Headers = erlaws3_headers:generate(BucketUrl ++ ":443", "DELETE", ObjectName, Query, AwsRegion, ?SCOPE),
+  Headers = erlaws3_headers:generate(BucketUrl, "DELETE", ObjectName, Query, AwsRegion, ?SCOPE),
 
-  case erlaws3_utils:http_delete(ConnPid, ObjectName ++ "?" ++ Query, Headers, #{}) of
+  case erlaws3_utils:http_delete(ConnPid, ObjectName ++ "?" ++ Query, Headers) of
     {ok, #{status_code := 204}} ->
       {ok, true};
     {ok, #{status_code := 404}} ->
