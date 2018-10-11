@@ -13,8 +13,11 @@
   http_get/3,
   http_post/4,
   http_put/4,
+  http_stream/5,
   http_delete/3
 ]).
+
+-define(DEFAULT_CHUNK_SIZE, 1048576).
 
 %%====================================================================
 %% @doc Utilities
@@ -48,8 +51,21 @@ http_put(ConnPid, Path, Headers, Payload) ->
 http_delete(ConnPid, Path, Headers) ->
   http_request(ConnPid, delete, Path, Headers, <<>>).
 
+http_stream(ConnPid, Method, Path, Headers, File) ->
+  ChunkSize = application:get_env(erlaws3, chunk_size, ?DEFAULT_CHUNK_SIZE),
+  FileSize = filelib:file_size(File),
+  Headers1 = [{"content-length", FileSize}|Headers],
+  hackney:send_request(ConnPid, {Method, list_to_binary(Path), Headers1, stream}),
+  ok = hackney:send_body(ConnPid, {file, File, [{chunk_size, ChunkSize}]}),
+  Response = hackney:start_response(ConnPid),
+  http_response(ConnPid, Response).
+
 http_request(ConnPid, Method, Path, Headers, Payload) ->
-  case hackney:send_request(ConnPid, {Method, list_to_binary(Path), Headers, Payload}) of
+  Response = hackney:send_request(ConnPid, {Method, list_to_binary(Path), Headers, Payload}),
+  http_response(ConnPid, Response).
+
+http_response(ConnPid, Response) ->
+  case Response of
     {ok, StatusCode, RespHeaders, _Ref} ->
       {ok, Body} = hackney:body(ConnPid),
       Resp = case exml:parse(Body) of

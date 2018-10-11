@@ -20,20 +20,20 @@
 %%====================================================================
 %% @doc Single Upload
 %%====================================================================
-single_upload(ConnPid, BucketUrl, ObjectName, AwsRegion, Payload) ->
-  single_upload(ConnPid, BucketUrl, ObjectName, AwsRegion, Payload, 0).
+single_upload(ConnPid, BucketUrl, ObjectName, AwsRegion, File) ->
+  single_upload(ConnPid, BucketUrl, ObjectName, AwsRegion, File, 0).
 
-single_upload(ConnPid, BucketUrl, ObjectName, AwsRegion, Payload, Retry) ->
+single_upload(ConnPid, BucketUrl, ObjectName, AwsRegion, File, Retry) ->
   MaxRetry = application:get_env(erlaws3, max_retry, 3),
   Headers = erlaws3_headers:generate(BucketUrl, "PUT", ObjectName, "", AwsRegion, ?SCOPE),
-  Result = erlaws3_utils:http_put(ConnPid, ObjectName, Headers, Payload),
+  Result = erlaws3_utils:http_stream(ConnPid, put, ObjectName, Headers, File),
   case Result of
     {ok, #{status_code := 200, headers := Resp}} ->
       {<<"ETag">>, Etag} = lists:keyfind(<<"ETag">>, 1, Resp),
       {ok, Etag};
     {error, Error} ->
       if Retry < MaxRetry ->
-        single_upload(ConnPid, BucketUrl, ObjectName, AwsRegion, Payload, Retry + 1);
+        single_upload(ConnPid, BucketUrl, ObjectName, AwsRegion, File, Retry + 1);
       true ->
         {error, Error}
       end;

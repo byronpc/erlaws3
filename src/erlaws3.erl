@@ -48,8 +48,7 @@ upload(ConnPid, Bucket, AwsRegion, ObjectName, File) ->
 
     % if file is less than 5MB, single upload the file
     _ ->
-      {ok, Payload} = file:read_file(File),
-      erlaws3_lib:single_upload(ConnPid, BucketUrl, ObjectName, AwsRegion, Payload)
+      erlaws3_lib:single_upload(ConnPid, BucketUrl, ObjectName, AwsRegion, File)
   end.
 
 %% Utility function to spawn multiple process for uploading parts
