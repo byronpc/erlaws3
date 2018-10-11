@@ -8,8 +8,7 @@
   single_upload/5,
   initiate_multipart_upload/4,
   list_parts/5,
-  upload_part/6,
-  upload_part/7,
+  upload_part/8,
   complete_multipart_upload/6,
   abort_multipart_upload/5
 ]).
@@ -69,17 +68,17 @@ list_parts(ConnPid, BucketUrl, ObjectName, AwsRegion, UploadId) ->
 
 %%====================================================================
 %% @doc Upload Part
-%% Use upload_part/6 for succeeding parts to spawn new http connection
+%% Use upload_part/8 for succeeding parts to spawn new http connection
 %%====================================================================
-upload_part(BucketUrl, ObjectName, AwsRegion, UploadId, PartNumber, Payload) ->
-  upload_part(BucketUrl, ObjectName, AwsRegion, UploadId, PartNumber, Payload, 0).
+upload_part(BucketUrl, ObjectName, AwsRegion, UploadId, PartNumber, Fid, Offset, ContentSize) ->
+  upload_part(BucketUrl, ObjectName, AwsRegion, UploadId, PartNumber, Fid, Offset, ContentSize, 0).
 
-upload_part(BucketUrl, ObjectName, AwsRegion, UploadId, PartNumber, Payload, Retry) ->
+upload_part(BucketUrl, ObjectName, AwsRegion, UploadId, PartNumber, Fid, Offset, ContentSize, Retry) ->
   {ok, ConnPid} = erlaws3_utils:http_open(BucketUrl, 443),
   MaxRetry = application:get_env(erlaws3, max_retry, 3),
   Query = "partNumber=" ++ integer_to_list(PartNumber) ++ "&uploadId=" ++ UploadId,
   Headers = erlaws3_headers:generate(BucketUrl, "PUT", ObjectName, Query, AwsRegion, ?SCOPE),
-  Result = erlaws3_utils:http_put(ConnPid, ObjectName ++ "?" ++ Query, Headers, Payload),
+  Result = erlaws3_utils:http_stream(ConnPid, put, ObjectName ++ "?" ++ Query, Headers, Fid, Offset, ContentSize),
   case Result of
     {ok, #{status_code := 200, headers := Resp}} ->
       {<<"ETag">>, Etag} = lists:keyfind(<<"ETag">>, 1, Resp),
@@ -87,7 +86,7 @@ upload_part(BucketUrl, ObjectName, AwsRegion, UploadId, PartNumber, Payload, Ret
     {_, Error} ->
       erlaws3_utils:http_close(ConnPid),
       if Retry < MaxRetry ->
-        upload_part(BucketUrl, ObjectName, AwsRegion, UploadId, PartNumber, Payload, Retry + 1);
+        upload_part(BucketUrl, ObjectName, AwsRegion, UploadId, PartNumber, Fid, Offset, ContentSize, Retry + 1);
       true ->
         {error, Error}
       end

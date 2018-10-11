@@ -22,6 +22,8 @@ Make sure to define your access/secret keys in the AWS config
   {max_parts, 10000}, % maximum number of parts per upload
   {part_size, 5242880}, % multipart split size
 
+  {chunk_size, 1048576}, % file stream chunk size in memory
+
   %% Make sure to define a reasonable upload timeout
   %% based on the part_size and max_retry parameters
 

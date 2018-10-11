@@ -14,6 +14,7 @@
   http_post/4,
   http_put/4,
   http_stream/5,
+  http_stream/7,
   http_delete/3
 ]).
 
@@ -52,11 +53,15 @@ http_delete(ConnPid, Path, Headers) ->
   http_request(ConnPid, delete, Path, Headers, <<>>).
 
 http_stream(ConnPid, Method, Path, Headers, File) ->
-  ChunkSize = application:get_env(erlaws3, chunk_size, ?DEFAULT_CHUNK_SIZE),
   FileSize = filelib:file_size(File),
-  Headers1 = [{"content-length", FileSize}|Headers],
+  {ok, Fid} = file:open(File, [read]),
+  http_stream(ConnPid, Method, Path, Headers, Fid, 0, FileSize).
+
+http_stream(ConnPid, Method, Path, Headers, Fid, Offset, ContentSize) ->
+  ChunkSize = application:get_env(erlaws3, chunk_size, ?DEFAULT_CHUNK_SIZE),
+  Headers1 = [{"content-length", ContentSize}|Headers],
   hackney:send_request(ConnPid, {Method, list_to_binary(Path), Headers1, stream}),
-  ok = hackney:send_body(ConnPid, {file, File, [{chunk_size, ChunkSize}]}),
+  chunk_send_body(ConnPid, Fid, ChunkSize, Offset, ContentSize),
   Response = hackney:start_response(ConnPid),
   http_response(ConnPid, Response).
 
@@ -75,4 +80,16 @@ http_response(ConnPid, Response) ->
       {ok, #{status_code => StatusCode, headers => RespHeaders, body => Resp}};
     E ->
       E
+  end.
+
+chunk_send_body(ConnPid, Fid, ChunkSize, Offset, ContentSize) ->
+  NextContentSize = ContentSize - ChunkSize,
+  NextOffset = Offset + ChunkSize,
+  if NextContentSize < 1 ->
+    {ok, Bytes} = file:pread(Fid, [{Offset, ContentSize}]),
+    ok = hackney:send_body(ConnPid, Bytes);
+  true ->
+    {ok, Bytes} = file:pread(Fid, [{Offset, ChunkSize}]),
+    ok = hackney:send_body(ConnPid, Bytes),
+    chunk_send_body(ConnPid, Fid, ChunkSize, NextOffset, NextContentSize)
   end.

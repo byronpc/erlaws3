@@ -36,9 +36,9 @@ upload(ConnPid, Bucket, AwsRegion, ObjectName, File) ->
 
       % initiate multipart upload
       {ok, UploadId} = erlaws3_lib:initiate_multipart_upload(ConnPid, BucketUrl, ObjectName, AwsRegion),
-      {PartCount, PartSize} = define_parts(FileSize),
+      {PartCount, PartSize, LastSize} = define_parts(FileSize),
 
-      case upload_parts(BucketUrl, ObjectName, AwsRegion, UploadId, File, PartCount, PartSize) of
+      case upload_parts(BucketUrl, ObjectName, AwsRegion, UploadId, File, PartCount, PartSize, LastSize) of
         {ok, Parts} ->
           erlaws3_lib:complete_multipart_upload(ConnPid, BucketUrl, ObjectName, AwsRegion, UploadId, Parts);
         {error, ErrorParts} ->
@@ -52,7 +52,7 @@ upload(ConnPid, Bucket, AwsRegion, ObjectName, File) ->
   end.
 
 %% Utility function to spawn multiple process for uploading parts
-upload_parts(BucketUrl, ObjectName, AwsRegion, UploadId, File, PartCount, PartSize) ->
+upload_parts(BucketUrl, ObjectName, AwsRegion, UploadId, File, PartCount, PartSize, LastSize) ->
   Timeout = application:get_env(erlaws3, part_upload_timeout, 60000),
 
   Caller = self(),
@@ -64,11 +64,16 @@ upload_parts(BucketUrl, ObjectName, AwsRegion, UploadId, File, PartCount, PartSi
   Pids = [ {PartNumber, spawn_link(fun() ->
 
     %% read bytes
-    StartByte = (PartNumber - 1) * PartSize,
-    {ok, Bytes} = file:pread(Fid, [{StartByte, PartSize}]),
+    Offset = (PartNumber - 1) * PartSize,
+
+    ContentSize = if PartNumber == PartCount ->
+      LastSize;
+    true ->
+      PartSize
+    end,
 
     %% upload bytes
-    Result = erlaws3_lib:upload_part(BucketUrl, ObjectName, AwsRegion, UploadId, PartNumber, Bytes),
+    Result = erlaws3_lib:upload_part(BucketUrl, ObjectName, AwsRegion, UploadId, PartNumber, Fid, Offset, ContentSize),
 
     %% send result to caller
     Caller ! {self(), Result}
@@ -79,6 +84,9 @@ upload_parts(BucketUrl, ObjectName, AwsRegion, UploadId, File, PartCount, PartSi
   Parts = [ receive {Pid, R} -> {PartNumber, R}
             after Timeout -> {PartNumber, {error, timeout}}
             end || {PartNumber, Pid} <- Pids ],
+
+  %% close file
+  file:close(Fid),
 
   %% check if all uploads are successful
   {Success, Errors} = lists:foldr(fun({PartNumber, {Status, Result}}, {S, E}) ->
@@ -100,9 +108,11 @@ define_parts(FileSize) ->
 
   if (FileSize > MaxParts * PartSize) ->
     PartSize2 = ceil(FileSize/MaxParts),
-    {MaxParts, PartSize2};
+    LastSize = FileSize rem PartSize2,
+    {MaxParts, PartSize2, LastSize};
   true ->
     PartCount = ceil(FileSize/PartSize),
-    {PartCount, PartSize}
+    LastSize = FileSize rem PartSize,
+    {PartCount, PartSize, LastSize}
   end.
 
