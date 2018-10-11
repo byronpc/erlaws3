@@ -8,10 +8,14 @@
 -define(BUCKET_URL(Bucket), Bucket ++ ".s3.amazonaws.com").
 -define(MIN_PART_SIZE, 5242880). % S3 Minumum Size for Multipart Upload
 
+-type etag() :: string().
+-type gun_pid() :: pid().
+
 %%====================================================================
 %% @doc Upload File
 %% upload("bucket", "region", "/sample_file", "file_path")
 %%====================================================================
+-spec upload(string(), string(), string(), string()) -> {ok, etag()} | {error, any()}.
 upload(Bucket, AwsRegion, ObjectName, File) ->
   BucketUrl = ?BUCKET_URL(Bucket),
   case erlaws3_utils:http_open(BucketUrl, 443) of
@@ -22,6 +26,7 @@ upload(Bucket, AwsRegion, ObjectName, File) ->
     E -> E
   end.
 
+-spec upload(gun_pid(), string(), string(), string(), string()) -> {ok, etag()} | {error, any()}.
 upload(ConnPid, Bucket, AwsRegion, ObjectName, File) ->
   BucketUrl = ?BUCKET_URL(Bucket),
   case filelib:file_size(File) of
