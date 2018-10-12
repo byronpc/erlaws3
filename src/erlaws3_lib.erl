@@ -13,7 +13,7 @@
   abort_multipart_upload/5
 ]).
 
--include_lib("exml/include/exml.hrl").
+-include_lib("erlxml/include/erlxml.hrl").
 -define(SCOPE, "s3").
 
 %%====================================================================
@@ -47,7 +47,7 @@ initiate_multipart_upload(ConnPid, BucketUrl, ObjectName, AwsRegion) ->
   Headers = erlaws3_headers:generate(BucketUrl, "POST", ObjectName, Query, AwsRegion, ?SCOPE),
   case erlaws3_utils:http_post(ConnPid, ObjectName ++ "?" ++ Query, Headers, <<>>) of
     {ok, #{status_code := 200, body := Xml}} ->
-      {ok, binary_to_list(exml_query:cdata(exml_query:subelement(Xml, <<"UploadId">>)))};
+      {ok, binary_to_list(erlxml_utils:subel_cdata(Xml, <<"UploadId">>))};
     {_, Error} ->
       {error, Error} % unhandled errors if any
   end.
@@ -104,10 +104,10 @@ complete_multipart_upload(ConnPid, BucketUrl, ObjectName, AwsRegion, UploadId, P
       #xmlel{name = <<"ETag">>, children = [{xmlcdata, Etag}]}
     ]}
   || {PartNumber, Etag} <- Parts],
-  Payload = exml:to_binary(#xmlel{name = <<"CompleteMultipartUpload">>, children = PartsXml}),
+  Payload = erlxml:to_binary(#xmlel{name = <<"CompleteMultipartUpload">>, children = PartsXml}),
   case erlaws3_utils:http_post(ConnPid, ObjectName ++ "?" ++ Query, Headers, Payload) of
     {ok, #{body := #xmlel{name = <<"CompleteMultipartUploadResult">>} = Xml}} ->
-      {ok, exml_query:cdata(exml_query:subelement(Xml, <<"ETag">>))};
+      {ok, erlxml_utils:subel_cdata(Xml, <<"ETag">>)};
     {ok, #{body := #xmlel{name = <<"Error">>, children = Children}}} ->
       {error, [{Name, Cdata} || #xmlel{name = Name, children = [{xmlcdata, Cdata}]} <- Children]};
     {_, Error} ->

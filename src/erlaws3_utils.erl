@@ -73,7 +73,7 @@ http_response(ConnPid, Response) ->
   case Response of
     {ok, StatusCode, RespHeaders, _Ref} ->
       {ok, Body} = hackney:body(ConnPid),
-      Resp = case exml:parse(Body) of
+      Resp = case erlxml:parse(Body) of
         {ok, Xml} -> Xml;
         _ -> Body
       end,
