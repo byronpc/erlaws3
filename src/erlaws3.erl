@@ -4,7 +4,7 @@
 %% @end
 %%%-------------------------------------------------------------------
 -module(erlaws3).
--export([upload/4, upload/5]).
+-export([upload/4, upload/5, delete/3, delete/4]).
 -define(BUCKET_URL(Bucket), Bucket ++ ".s3.amazonaws.com").
 -define(MIN_PART_SIZE, 5242880). % S3 Minumum Size for Multipart Upload
 
@@ -50,6 +50,26 @@ upload(ConnPid, Bucket, AwsRegion, ObjectName, File) ->
     _ ->
       erlaws3_lib:single_upload(ConnPid, BucketUrl, ObjectName, AwsRegion, File)
   end.
+
+%%====================================================================
+%% @doc Delete File
+%% delete("bucket", "region", "/sample_file")
+%%====================================================================
+-spec delete(string(), string(), string()) -> {ok, true} | {error, any()}.
+delete(Bucket, AwsRegion, ObjectName) ->
+  BucketUrl = ?BUCKET_URL(Bucket),
+  case erlaws3_utils:http_open(BucketUrl, 443) of
+    {ok, ConnPid} ->
+      Result = delete(ConnPid, Bucket, AwsRegion, ObjectName),
+      erlaws3_utils:http_close(ConnPid),
+      Result;
+    E -> E
+  end.
+
+-spec delete(gun_pid(), string(), string(), string()) -> {ok, true} | {error, any()}.
+delete(ConnPid, Bucket, AwsRegion, ObjectName) ->
+  BucketUrl = ?BUCKET_URL(Bucket),
+  erlaws3_lib:delete_object(ConnPid, BucketUrl, ObjectName, AwsRegion).
 
 %% Utility function to spawn multiple process for uploading parts
 upload_parts(BucketUrl, ObjectName, AwsRegion, UploadId, File, PartCount, PartSize, LastSize) ->

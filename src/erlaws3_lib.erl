@@ -10,7 +10,8 @@
   list_parts/5,
   upload_part/8,
   complete_multipart_upload/6,
-  abort_multipart_upload/5
+  abort_multipart_upload/5,
+  delete_object/4
 ]).
 
 -include_lib("erlxml/include/erlxml.hrl").
@@ -114,6 +115,9 @@ complete_multipart_upload(ConnPid, BucketUrl, ObjectName, AwsRegion, UploadId, P
       {error, Error} % unhandled errors if any
   end.
 
+%%====================================================================
+%% @doc Abort Multipart Upload
+%%====================================================================
 abort_multipart_upload(ConnPid, BucketUrl, ObjectName, AwsRegion, UploadId) ->
   Query = "uploadId=" ++ UploadId,
   Headers = erlaws3_headers:generate(BucketUrl, "DELETE", ObjectName, Query, AwsRegion, ?SCOPE),
@@ -123,6 +127,19 @@ abort_multipart_upload(ConnPid, BucketUrl, ObjectName, AwsRegion, UploadId) ->
       {ok, true};
     {ok, #{status_code := 404}} ->
       {error, no_such_upload};
+    {_, Error} ->
+      {error, Error} % unhandled errors if any
+  end.
+
+%%====================================================================
+%% @doc Delete Object
+%%====================================================================
+delete_object(ConnPid, BucketUrl, ObjectName, AwsRegion) ->
+  Headers = erlaws3_headers:generate(BucketUrl, "DELETE", ObjectName, "", AwsRegion, ?SCOPE),
+
+  case erlaws3_utils:http_delete(ConnPid, ObjectName, Headers) of
+    {ok, #{status_code := 204}} ->
+      {ok, true};
     {_, Error} ->
       {error, Error} % unhandled errors if any
   end.
