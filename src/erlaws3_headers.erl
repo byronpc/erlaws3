@@ -42,7 +42,7 @@ generate_signature(HttpVerb, CanonicalUri, CanonicalQueryString, Headers, AwsReg
 %%====================================================================
 generate_canonical_request(HttpVerb, CanonicalUri, CanonicalQueryString, Headers) ->
   Headers1 = lists:sort(Headers),
-  CanonicalHeaders = lists:flatten([[string:to_lower(N), ":", string:strip(V), "\n"] || {N, V} <- Headers1]),
+  CanonicalHeaders = lists:flatten([[string:to_lower(N), ":", string:trim(V), "\n"] || {N, V} <- Headers1]),
   SignedHeaders = string:join([ string:to_lower(N) || {N, _V} <- Headers1], ";"),
   CanonicalRequest = string:join([
     HttpVerb, CanonicalUri,
