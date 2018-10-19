@@ -5,6 +5,10 @@
 %%%-------------------------------------------------------------------
 -module(erlaws3).
 -export([upload/4, upload/5, delete/3, delete/4]).
+
+% Stream upload
+-export([open_stream/4, upload_to_stream/2, close_stream/1]).
+
 -define(BUCKET_URL(Bucket), Bucket ++ ".s3.amazonaws.com").
 -define(MIN_PART_SIZE, 5242880). % S3 Minumum Size for Multipart Upload
 
@@ -13,7 +17,7 @@
 
 %%====================================================================
 %% @doc Upload File
-%% upload("bucket", "region", "/sample_file", "file_path")
+%% upload("bucket", "region", "/aws_file_path", "/input_file_path")
 %%====================================================================
 -spec upload(string(), string(), string(), string()) -> {ok, etag()} | {error, any()}.
 upload(Bucket, AwsRegion, ObjectName, File) ->
@@ -53,7 +57,7 @@ upload(ConnPid, Bucket, AwsRegion, ObjectName, File) ->
 
 %%====================================================================
 %% @doc Delete File
-%% delete("bucket", "region", "/sample_file")
+%% delete("bucket", "region", "/aws_file_path")
 %%====================================================================
 -spec delete(string(), string(), string()) -> {ok, true} | {error, any()}.
 delete(Bucket, AwsRegion, ObjectName) ->
@@ -70,6 +74,36 @@ delete(Bucket, AwsRegion, ObjectName) ->
 delete(ConnPid, Bucket, AwsRegion, ObjectName) ->
   BucketUrl = ?BUCKET_URL(Bucket),
   erlaws3_lib:delete_object(ConnPid, BucketUrl, ObjectName, AwsRegion).
+
+%%====================================================================
+%% @doc Open Uploading Stream (For manual chunk uploading)
+%% open_stream("bucket", "region", "/aws_file_path", 10)
+%%====================================================================
+-spec open_stream(string(), string(), string(), integer()) -> {ok, pid()} | {error, any()}.
+open_stream(Bucket, AwsRegion, ObjectName, ContentSize) ->
+  BucketUrl = ?BUCKET_URL(Bucket),
+  case erlaws3_utils:http_open(BucketUrl, 443) of
+    {ok, ConnPid} ->
+      erlaws3_lib:manual_stream_upload(ConnPid, BucketUrl, ObjectName, AwsRegion, ContentSize);
+    E -> E
+  end.
+
+%%====================================================================
+%% @doc Manually upload Bytes to Stream
+%% upload_to_stream(ConnPid, <<1,2,3,4>>)
+%%====================================================================
+-spec upload_to_stream(pid(), binary()) -> ok.
+upload_to_stream(ConnPid, Bytes) ->
+  hackney:send_body(ConnPid, Bytes).
+
+%%====================================================================
+%% @doc Close the stream
+%% close_stream(ConnPid)
+%%====================================================================
+-spec close_stream(pid()) -> ok.
+close_stream(ConnPid) ->
+  erlaws3_utils:http_close(ConnPid).
+
 
 %% Utility function to spawn multiple process for uploading parts
 upload_parts(BucketUrl, ObjectName, AwsRegion, UploadId, File, PartCount, PartSize, LastSize) ->

@@ -11,7 +11,8 @@
   upload_part/8,
   complete_multipart_upload/6,
   abort_multipart_upload/5,
-  delete_object/4
+  delete_object/4,
+  manual_stream_upload/5
 ]).
 
 -include_lib("erlxml/include/erlxml.hrl").
@@ -143,3 +144,11 @@ delete_object(ConnPid, BucketUrl, ObjectName, AwsRegion) ->
     {_, Error} ->
       {error, Error} % unhandled errors if any
   end.
+
+%%====================================================================
+%% @doc Manual Stream Upload
+%%====================================================================
+manual_stream_upload(ConnPid, BucketUrl, ObjectName, AwsRegion, ContentSize) ->
+  Headers = [ {"content-length", ContentSize} |
+  erlaws3_headers:generate(BucketUrl, "PUT", ObjectName, "", AwsRegion, ?SCOPE)],
+  hackney:send_request(ConnPid, {put, list_to_binary(ObjectName), Headers, stream}).
