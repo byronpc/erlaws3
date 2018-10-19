@@ -4,10 +4,10 @@
 %% @end
 %%%-------------------------------------------------------------------
 -module(erlaws3).
--export([upload/4, upload/5, delete/3, delete/4]).
+-export([upload/2, upload/4, upload/5, delete/1, delete/3, delete/4]).
 
 % Stream upload
--export([open_stream/4, upload_to_stream/2, close_stream/1]).
+-export([open_stream/2, open_stream/4, upload_to_stream/2, close_stream/1]).
 
 -define(BUCKET_URL(Bucket), Bucket ++ ".s3.amazonaws.com").
 -define(MIN_PART_SIZE, 5242880). % S3 Minumum Size for Multipart Upload
@@ -19,6 +19,12 @@
 %% @doc Upload File
 %% upload("bucket", "region", "/aws_file_path", "/input_file_path")
 %%====================================================================
+-spec upload(string(), string()) -> {ok, etag()} | {error, any()}.
+  upload(ObjectName, File) ->
+  {ok, Bucket} = application:get_env(erlaws3, default_bucket),
+  {ok, Region} = application:get_env(erlaws3, default_region),
+  upload(Bucket, Region, ObjectName, File).
+
 -spec upload(string(), string(), string(), string()) -> {ok, etag()} | {error, any()}.
 upload(Bucket, AwsRegion, ObjectName, File) ->
   BucketUrl = ?BUCKET_URL(Bucket),
@@ -59,6 +65,12 @@ upload(ConnPid, Bucket, AwsRegion, ObjectName, File) ->
 %% @doc Delete File
 %% delete("bucket", "region", "/aws_file_path")
 %%====================================================================
+-spec delete(string()) -> {ok, true} | {error, any()}.
+delete(ObjectName) ->
+  {ok, Bucket} = application:get_env(erlaws3, default_bucket),
+  {ok, Region} = application:get_env(erlaws3, default_region),
+  delete(Bucket, Region, ObjectName).
+
 -spec delete(string(), string(), string()) -> {ok, true} | {error, any()}.
 delete(Bucket, AwsRegion, ObjectName) ->
   BucketUrl = ?BUCKET_URL(Bucket),
@@ -79,6 +91,12 @@ delete(ConnPid, Bucket, AwsRegion, ObjectName) ->
 %% @doc Open Uploading Stream (For manual chunk uploading)
 %% open_stream("bucket", "region", "/aws_file_path", 10)
 %%====================================================================
+-spec open_stream(string(), integer()) -> {ok, pid()} | {error, any()}.
+open_stream(ObjectName, ContentSize) ->
+  {ok, Bucket} = application:get_env(erlaws3, default_bucket),
+  {ok, Region} = application:get_env(erlaws3, default_region),
+  open_stream(Bucket, Region, ObjectName, ContentSize).
+
 -spec open_stream(string(), string(), string(), integer()) -> {ok, pid()} | {error, any()}.
 open_stream(Bucket, AwsRegion, ObjectName, ContentSize) ->
   BucketUrl = ?BUCKET_URL(Bucket),

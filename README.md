@@ -13,6 +13,9 @@ Make sure to define your access/secret keys in the AWS config
   {access_key, ""},
   {secret_key, ""},
 
+  {default_bucket, ""},
+  {default_region, ""},
+
   %% if file_size > max_parts * part_size
   %% part_size = file_size / max_parts
   %% AWS part size minimum is 5242880 and maximum is 5GB
