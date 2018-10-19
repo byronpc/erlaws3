@@ -9,23 +9,23 @@
 % Stream upload
 -export([open_stream/2, open_stream/4, upload_to_stream/2, close_stream/1]).
 
--define(BUCKET_URL(Bucket), Bucket ++ ".s3.amazonaws.com").
+-define(BUCKET_URL(Bucket), <<Bucket/binary, ".s3.amazonaws.com">>).
 -define(MIN_PART_SIZE, 5242880). % S3 Minumum Size for Multipart Upload
 
--type etag() :: string().
+-type etag() :: bitstring().
 -type gun_pid() :: pid().
 
 %%====================================================================
 %% @doc Upload File
-%% upload("bucket", "region", "/aws_file_path", "/input_file_path")
+%% upload(<<"bucket">>, <<"region">>, <<"/aws_file_path">>, <<"/input_file_path">>)
 %%====================================================================
--spec upload(string(), string()) -> {ok, etag()} | {error, any()}.
+-spec upload(bitstring(), bitstring()) -> {ok, etag()} | {error, any()}.
   upload(ObjectName, File) ->
   {ok, Bucket} = application:get_env(erlaws3, default_bucket),
   {ok, Region} = application:get_env(erlaws3, default_region),
   upload(Bucket, Region, ObjectName, File).
 
--spec upload(string(), string(), string(), string()) -> {ok, etag()} | {error, any()}.
+-spec upload(bitstring(), bitstring(), bitstring(), bitstring()) -> {ok, etag()} | {error, any()}.
 upload(Bucket, AwsRegion, ObjectName, File) ->
   BucketUrl = ?BUCKET_URL(Bucket),
   case erlaws3_utils:http_open(BucketUrl, 443) of
@@ -36,7 +36,7 @@ upload(Bucket, AwsRegion, ObjectName, File) ->
     E -> E
   end.
 
--spec upload(gun_pid(), string(), string(), string(), string()) -> {ok, etag()} | {error, any()}.
+-spec upload(gun_pid(), bitstring(), bitstring(), bitstring(), bitstring()) -> {ok, etag()} | {error, any()}.
 upload(ConnPid, Bucket, AwsRegion, ObjectName, File) ->
   BucketUrl = ?BUCKET_URL(Bucket),
   case filelib:file_size(File) of
@@ -63,15 +63,15 @@ upload(ConnPid, Bucket, AwsRegion, ObjectName, File) ->
 
 %%====================================================================
 %% @doc Delete File
-%% delete("bucket", "region", "/aws_file_path")
+%% delete(<<"bucket">>, <<"region">>, <<"/aws_file_path">>)
 %%====================================================================
--spec delete(string()) -> {ok, true} | {error, any()}.
+-spec delete(bitstring()) -> {ok, true} | {error, any()}.
 delete(ObjectName) ->
   {ok, Bucket} = application:get_env(erlaws3, default_bucket),
   {ok, Region} = application:get_env(erlaws3, default_region),
   delete(Bucket, Region, ObjectName).
 
--spec delete(string(), string(), string()) -> {ok, true} | {error, any()}.
+-spec delete(bitstring(), bitstring(), bitstring()) -> {ok, true} | {error, any()}.
 delete(Bucket, AwsRegion, ObjectName) ->
   BucketUrl = ?BUCKET_URL(Bucket),
   case erlaws3_utils:http_open(BucketUrl, 443) of
@@ -82,22 +82,22 @@ delete(Bucket, AwsRegion, ObjectName) ->
     E -> E
   end.
 
--spec delete(gun_pid(), string(), string(), string()) -> {ok, true} | {error, any()}.
+-spec delete(gun_pid(), bitstring(), bitstring(), bitstring()) -> {ok, true} | {error, any()}.
 delete(ConnPid, Bucket, AwsRegion, ObjectName) ->
   BucketUrl = ?BUCKET_URL(Bucket),
   erlaws3_lib:delete_object(ConnPid, BucketUrl, ObjectName, AwsRegion).
 
 %%====================================================================
 %% @doc Open Uploading Stream (For manual chunk uploading)
-%% open_stream("bucket", "region", "/aws_file_path", 10)
+%% open_stream(<<"bucket">>, <<"region">>, <<"/aws_file_path">>, 10)
 %%====================================================================
--spec open_stream(string(), integer()) -> {ok, pid()} | {error, any()}.
+-spec open_stream(bitstring(), integer()) -> {ok, pid()} | {error, any()}.
 open_stream(ObjectName, ContentSize) ->
   {ok, Bucket} = application:get_env(erlaws3, default_bucket),
   {ok, Region} = application:get_env(erlaws3, default_region),
   open_stream(Bucket, Region, ObjectName, ContentSize).
 
--spec open_stream(string(), string(), string(), integer()) -> {ok, pid()} | {error, any()}.
+-spec open_stream(bitstring(), bitstring(), bitstring(), integer()) -> {ok, pid()} | {error, any()}.
 open_stream(Bucket, AwsRegion, ObjectName, ContentSize) ->
   BucketUrl = ?BUCKET_URL(Bucket),
   case erlaws3_utils:http_open(BucketUrl, 443) of

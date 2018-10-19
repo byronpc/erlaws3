@@ -10,11 +10,11 @@ Make sure to define your access/secret keys in the AWS config
 {erlaws3, [
 
   %% AWS keys
-  {access_key, ""},
-  {secret_key, ""},
+  {access_key, <<>>},
+  {secret_key, <<>>},
 
-  {default_bucket, ""},
-  {default_region, ""},
+  {default_bucket, <<>>},
+  {default_region, <<>>},
 
   %% if file_size > max_parts * part_size
   %% part_size = file_size / max_parts

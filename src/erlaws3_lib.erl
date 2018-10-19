@@ -16,7 +16,7 @@
 ]).
 
 -include_lib("erlxml/include/erlxml.hrl").
--define(SCOPE, "s3").
+-define(SCOPE, <<"s3">>).
 
 %%====================================================================
 %% @doc Single Upload
@@ -26,7 +26,7 @@ single_upload(ConnPid, BucketUrl, ObjectName, AwsRegion, File) ->
 
 single_upload(ConnPid, BucketUrl, ObjectName, AwsRegion, File, Retry) ->
   MaxRetry = application:get_env(erlaws3, max_retry, 3),
-  Headers = erlaws3_headers:generate(BucketUrl, "PUT", ObjectName, "", AwsRegion, ?SCOPE),
+  Headers = erlaws3_headers:generate(BucketUrl, <<"PUT">>, ObjectName, <<>>, AwsRegion, ?SCOPE),
   Result = erlaws3_utils:http_stream(ConnPid, put, ObjectName, Headers, File),
   case Result of
     {ok, #{status_code := 200, headers := Resp}} ->
@@ -45,11 +45,11 @@ single_upload(ConnPid, BucketUrl, ObjectName, AwsRegion, File, Retry) ->
 %% @doc Initiate Multipart Upload
 %%====================================================================
 initiate_multipart_upload(ConnPid, BucketUrl, ObjectName, AwsRegion) ->
-  Query = "uploads=",
-  Headers = erlaws3_headers:generate(BucketUrl, "POST", ObjectName, Query, AwsRegion, ?SCOPE),
-  case erlaws3_utils:http_post(ConnPid, ObjectName ++ "?" ++ Query, Headers, <<>>) of
+  Query = <<"uploads=">>,
+  Headers = erlaws3_headers:generate(BucketUrl, <<"POST">>, ObjectName, Query, AwsRegion, ?SCOPE),
+  case erlaws3_utils:http_post(ConnPid, <<ObjectName/binary, "?", Query/binary>>, Headers, <<>>) of
     {ok, #{status_code := 200, body := Xml}} ->
-      {ok, binary_to_list(erlxml_utils:subel_cdata(Xml, <<"UploadId">>))};
+      {ok, erlxml_utils:subel_cdata(Xml, <<"UploadId">>)};
     {_, Error} ->
       {error, Error} % unhandled errors if any
   end.
@@ -58,9 +58,9 @@ initiate_multipart_upload(ConnPid, BucketUrl, ObjectName, AwsRegion) ->
 %% @doc List Parts
 %%====================================================================
 list_parts(ConnPid, BucketUrl, ObjectName, AwsRegion, UploadId) ->
-  Query = "uploadId=" ++ UploadId,
-  Headers = erlaws3_headers:generate(BucketUrl, "GET", ObjectName, Query, AwsRegion, ?SCOPE),
-  case erlaws3_utils:http_get(ConnPid, ObjectName ++ "?" ++ Query, Headers) of
+  Query = <<"uploadId=", UploadId/binary>>,
+  Headers = erlaws3_headers:generate(BucketUrl, <<"GET">>, ObjectName, Query, AwsRegion, ?SCOPE),
+  case erlaws3_utils:http_get(ConnPid, <<ObjectName/binary, "?", Query/binary>>, Headers) of
     {ok, #{status_code := 200, body := #xmlel{children = Children}}} ->
       %% initiator/owner keys skipped
       {ok, [{Name, Cdata} || #xmlel{name = Name, children = [{xmlcdata, Cdata}]} <- Children]};
@@ -78,9 +78,9 @@ upload_part(BucketUrl, ObjectName, AwsRegion, UploadId, PartNumber, Fid, Offset,
 upload_part(BucketUrl, ObjectName, AwsRegion, UploadId, PartNumber, Fid, Offset, ContentSize, Retry) ->
   {ok, ConnPid} = erlaws3_utils:http_open(BucketUrl, 443),
   MaxRetry = application:get_env(erlaws3, max_retry, 3),
-  Query = "partNumber=" ++ integer_to_list(PartNumber) ++ "&uploadId=" ++ UploadId,
-  Headers = erlaws3_headers:generate(BucketUrl, "PUT", ObjectName, Query, AwsRegion, ?SCOPE),
-  Result = erlaws3_utils:http_stream(ConnPid, put, ObjectName ++ "?" ++ Query, Headers, Fid, Offset, ContentSize),
+  Query = <<"partNumber=", (integer_to_binary(PartNumber))/binary, "&uploadId=", UploadId/binary>>,
+  Headers = erlaws3_headers:generate(BucketUrl, <<"PUT">>, ObjectName, Query, AwsRegion, ?SCOPE),
+  Result = erlaws3_utils:http_stream(ConnPid, put, <<ObjectName/binary, "?", Query/binary>>, Headers, Fid, Offset, ContentSize),
   case Result of
     {ok, #{status_code := 200, headers := Resp}} ->
       {<<"ETag">>, Etag} = lists:keyfind(<<"ETag">>, 1, Resp),
@@ -98,8 +98,8 @@ upload_part(BucketUrl, ObjectName, AwsRegion, UploadId, PartNumber, Fid, Offset,
 %% @doc Complete Multipart Upload Part
 %%====================================================================
 complete_multipart_upload(ConnPid, BucketUrl, ObjectName, AwsRegion, UploadId, Parts) ->
-  Query = "uploadId=" ++ UploadId,
-  Headers = erlaws3_headers:generate(BucketUrl, "POST", ObjectName, Query, AwsRegion, ?SCOPE),
+  Query = <<"uploadId=", UploadId/binary>>,
+  Headers = erlaws3_headers:generate(BucketUrl, <<"POST">>, ObjectName, Query, AwsRegion, ?SCOPE),
   PartsXml = [
     #xmlel{name = <<"Part">>, children = [
       #xmlel{name = <<"PartNumber">>, children = [{xmlcdata, integer_to_binary(PartNumber)}]},
@@ -107,7 +107,7 @@ complete_multipart_upload(ConnPid, BucketUrl, ObjectName, AwsRegion, UploadId, P
     ]}
   || {PartNumber, Etag} <- Parts],
   Payload = erlxml:to_binary(#xmlel{name = <<"CompleteMultipartUpload">>, children = PartsXml}),
-  case erlaws3_utils:http_post(ConnPid, ObjectName ++ "?" ++ Query, Headers, Payload) of
+  case erlaws3_utils:http_post(ConnPid, <<ObjectName/binary, "?", Query/binary>>, Headers, Payload) of
     {ok, #{body := #xmlel{name = <<"CompleteMultipartUploadResult">>} = Xml}} ->
       {ok, erlxml_utils:subel_cdata(Xml, <<"ETag">>)};
     {ok, #{body := #xmlel{name = <<"Error">>, children = Children}}} ->
@@ -120,10 +120,10 @@ complete_multipart_upload(ConnPid, BucketUrl, ObjectName, AwsRegion, UploadId, P
 %% @doc Abort Multipart Upload
 %%====================================================================
 abort_multipart_upload(ConnPid, BucketUrl, ObjectName, AwsRegion, UploadId) ->
-  Query = "uploadId=" ++ UploadId,
-  Headers = erlaws3_headers:generate(BucketUrl, "DELETE", ObjectName, Query, AwsRegion, ?SCOPE),
+  Query = <<"uploadId=", UploadId/binary>>,
+  Headers = erlaws3_headers:generate(BucketUrl, <<"DELETE">>, ObjectName, Query, AwsRegion, ?SCOPE),
 
-  case erlaws3_utils:http_delete(ConnPid, ObjectName ++ "?" ++ Query, Headers) of
+  case erlaws3_utils:http_delete(ConnPid, <<ObjectName/binary, "?", Query/binary>>, Headers) of
     {ok, #{status_code := 204}} ->
       {ok, true};
     {ok, #{status_code := 404}} ->
@@ -136,7 +136,7 @@ abort_multipart_upload(ConnPid, BucketUrl, ObjectName, AwsRegion, UploadId) ->
 %% @doc Delete Object
 %%====================================================================
 delete_object(ConnPid, BucketUrl, ObjectName, AwsRegion) ->
-  Headers = erlaws3_headers:generate(BucketUrl, "DELETE", ObjectName, "", AwsRegion, ?SCOPE),
+  Headers = erlaws3_headers:generate(BucketUrl, <<"DELETE">>, ObjectName, <<>>, AwsRegion, ?SCOPE),
 
   case erlaws3_utils:http_delete(ConnPid, ObjectName, Headers) of
     {ok, #{status_code := 204}} ->
@@ -149,6 +149,6 @@ delete_object(ConnPid, BucketUrl, ObjectName, AwsRegion) ->
 %% @doc Manual Stream Upload
 %%====================================================================
 manual_stream_upload(ConnPid, BucketUrl, ObjectName, AwsRegion, ContentSize) ->
-  Headers = [ {"content-length", ContentSize} |
-  erlaws3_headers:generate(BucketUrl, "PUT", ObjectName, "", AwsRegion, ?SCOPE)],
-  hackney:send_request(ConnPid, {put, list_to_binary(ObjectName), Headers, stream}).
+  Headers = [ {<<"content-length">>, ContentSize} |
+  erlaws3_headers:generate(BucketUrl, <<"PUT">>, ObjectName, <<>>, AwsRegion, ?SCOPE)],
+  hackney:send_request(ConnPid, {put, ObjectName, Headers, stream}).

@@ -26,14 +26,14 @@
 %%====================================================================
 get_date() ->
   {Y,M,D} = date(),
-  lists:flatten(io_lib:format("~4..0w~2..0w~2..0w", [Y,M,D])).
+  list_to_binary(io_lib:format("~4..0w~2..0w~2..0w", [Y,M,D])).
 
 get_timestamp() ->
   {{Y,M,D},{H,Mi,S}}   = calendar:universal_time(),
-  lists:flatten(io_lib:format("~4..0w~2..0w~2..0wT~2..0w~2..0w~2..0wZ", [Y,M,D,H,Mi,S])).
+  list_to_binary(io_lib:format("~4..0w~2..0w~2..0wT~2..0w~2..0w~2..0wZ", [Y,M,D,H,Mi,S])).
 
 sha256_to_hex(<<Bin:256/big-unsigned-integer>>) ->
-  lists:flatten(io_lib:format("~64.16.0b", [Bin])).
+  list_to_binary(io_lib:format("~64.16.0b", [Bin])).
 
 http_open(Url, Port) ->
   hackney:connect(hackney_ssl, Url, Port).
@@ -60,14 +60,14 @@ http_stream(ConnPid, Method, Path, Headers, File) ->
 
 http_stream(ConnPid, Method, Path, Headers, Fid, Offset, ContentSize) ->
   ChunkSize = application:get_env(erlaws3, chunk_size, ?DEFAULT_CHUNK_SIZE),
-  Headers1 = [{"content-length", ContentSize}|Headers],
-  hackney:send_request(ConnPid, {Method, list_to_binary(Path), Headers1, stream}),
+  Headers1 = [{<<"content-length">>, ContentSize}|Headers],
+  hackney:send_request(ConnPid, {Method, Path, Headers1, stream}),
   chunk_send_body(ConnPid, Fid, ChunkSize, Offset, ContentSize),
   Response = hackney:start_response(ConnPid),
   http_response(ConnPid, Response).
 
 http_request(ConnPid, Method, Path, Headers, Payload) ->
-  Response = hackney:send_request(ConnPid, {Method, list_to_binary(Path), Headers, Payload}),
+  Response = hackney:send_request(ConnPid, {Method, Path, Headers, Payload}),
   http_response(ConnPid, Response).
 
 http_response(ConnPid, Response) ->
