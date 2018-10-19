@@ -57,4 +57,5 @@ ok
 5> erlaws3:upload_to_stream(Pid, "j").
 ok
 6> erlaws3:close_stream(Pid).
+{ok,<<"\"79b7c0e419a42d3cf53b8d6e959c5259\"">>}
 ```

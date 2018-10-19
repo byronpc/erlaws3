@@ -15,7 +15,8 @@
   http_put/4,
   http_stream/5,
   http_stream/7,
-  http_delete/3
+  http_delete/3,
+  http_response/2
 ]).
 
 -define(DEFAULT_CHUNK_SIZE, 1048576).

@@ -100,10 +100,17 @@ upload_to_stream(ConnPid, Bytes) ->
 %% @doc Close the stream
 %% close_stream(ConnPid)
 %%====================================================================
--spec close_stream(pid()) -> ok.
+-spec close_stream(pid()) -> {ok, etag()} | {error, any()}.
 close_stream(ConnPid) ->
-  erlaws3_utils:http_close(ConnPid).
-
+  R1 = hackney:start_response(ConnPid),
+  R2 = erlaws3_utils:http_response(ConnPid, R1),
+  erlaws3_utils:http_close(ConnPid),
+  case R2 of
+    {ok, #{status_code := 200, headers := Resp}} ->
+      {<<"ETag">>, Etag} = lists:keyfind(<<"ETag">>, 1, Resp),
+      {ok, Etag};
+    E -> E
+  end.
 
 %% Utility function to spawn multiple process for uploading parts
 upload_parts(BucketUrl, ObjectName, AwsRegion, UploadId, File, PartCount, PartSize, LastSize) ->
