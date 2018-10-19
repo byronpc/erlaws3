@@ -5,7 +5,8 @@
   {applications,
    [kernel,
     stdlib,
-    hackney
+    hackney,
+    erlxml
    ]},
   {env,[]},
   {modules, []},
