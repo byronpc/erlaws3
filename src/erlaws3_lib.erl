@@ -5,14 +5,14 @@
 %%%-------------------------------------------------------------------
 -module(erlaws3_lib).
 -export([
-  single_upload/5,
-  initiate_multipart_upload/4,
+  single_upload/6,
+  initiate_multipart_upload/5,
   list_parts/5,
   upload_part/8,
   complete_multipart_upload/6,
   abort_multipart_upload/5,
   delete_object/4,
-  manual_stream_upload/5
+  manual_stream_upload/6
 ]).
 
 -include_lib("erlxml/include/erlxml.hrl").
@@ -21,20 +21,20 @@
 %%====================================================================
 %% @doc Single Upload
 %%====================================================================
-single_upload(ConnPid, BucketUrl, ObjectName, AwsRegion, File) ->
-  single_upload(ConnPid, BucketUrl, ObjectName, AwsRegion, File, 0).
+single_upload(ConnPid, BucketUrl, ObjectName, AwsRegion, File, ExtraHeaders) ->
+  single_upload(ConnPid, BucketUrl, ObjectName, AwsRegion, File, ExtraHeaders, 0).
 
-single_upload(ConnPid, BucketUrl, ObjectName, AwsRegion, File, Retry) ->
+single_upload(ConnPid, BucketUrl, ObjectName, AwsRegion, File, ExtraHeaders, Retry) ->
   MaxRetry = application:get_env(erlaws3, max_retry, 3),
   Headers = erlaws3_headers:generate(BucketUrl, <<"PUT">>, ObjectName, <<>>, AwsRegion, ?SCOPE),
-  Result = erlaws3_utils:http_stream(ConnPid, put, ObjectName, Headers, File),
+  Result = erlaws3_utils:http_stream(ConnPid, put, ObjectName, Headers ++ ExtraHeaders, File),
   case Result of
     {ok, #{status_code := 200, headers := Resp}} ->
       {<<"ETag">>, Etag} = lists:keyfind(<<"ETag">>, 1, Resp),
       {ok, Etag};
     {error, Error} ->
       if Retry < MaxRetry ->
-        single_upload(ConnPid, BucketUrl, ObjectName, AwsRegion, File, Retry + 1);
+        single_upload(ConnPid, BucketUrl, ObjectName, AwsRegion, File, ExtraHeaders, Retry + 1);
       true ->
         {error, Error}
       end;
@@ -44,10 +44,10 @@ single_upload(ConnPid, BucketUrl, ObjectName, AwsRegion, File, Retry) ->
 %%====================================================================
 %% @doc Initiate Multipart Upload
 %%====================================================================
-initiate_multipart_upload(ConnPid, BucketUrl, ObjectName, AwsRegion) ->
+initiate_multipart_upload(ConnPid, BucketUrl, ObjectName, AwsRegion, ExtraHeaders) ->
   Query = <<"uploads=">>,
   Headers = erlaws3_headers:generate(BucketUrl, <<"POST">>, ObjectName, Query, AwsRegion, ?SCOPE),
-  case erlaws3_utils:http_post(ConnPid, <<ObjectName/binary, "?", Query/binary>>, Headers, <<>>) of
+  case erlaws3_utils:http_post(ConnPid, <<ObjectName/binary, "?", Query/binary>>, Headers ++ ExtraHeaders, <<>>) of
     {ok, #{status_code := 200, body := Xml}} ->
       {ok, erlxml_utils:subel_cdata(Xml, <<"UploadId">>)};
     {_, Error} ->
@@ -148,7 +148,7 @@ delete_object(ConnPid, BucketUrl, ObjectName, AwsRegion) ->
 %%====================================================================
 %% @doc Manual Stream Upload
 %%====================================================================
-manual_stream_upload(ConnPid, BucketUrl, ObjectName, AwsRegion, ContentSize) ->
-  Headers = [ {<<"content-length">>, ContentSize} |
+manual_stream_upload(ConnPid, BucketUrl, ObjectName, AwsRegion, ContentSize, ExtraHeaders) ->
+  Headers = ExtraHeaders ++ [ {<<"content-length">>, ContentSize} |
   erlaws3_headers:generate(BucketUrl, <<"PUT">>, ObjectName, <<>>, AwsRegion, ?SCOPE)],
   hackney:send_request(ConnPid, {put, ObjectName, Headers, stream}).

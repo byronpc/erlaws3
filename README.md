@@ -39,7 +39,7 @@ Make sure to define your access/secret keys in the AWS config
 If file size is less than 5MB, file will be uploaded via regular PUT operation
 
 ```erlang
-1> erlaws3:upload(<<"bucket">>, <<"region">>, <<"/aws_file_path">>, <<"/input_file_path">>)
+1> erlaws3:upload(<<"bucket">>, <<"region">>, <<"/aws_file_path">>, <<"/input_file_path">>, [{<<"content-type">>, <<"text/plain"}]).
 {ok,<<"\"upload_etag\"">>}
 
 2> erlaws3:delete(<<"bucket">>, <<"region">>, <<"/aws_file_path">>)
@@ -49,7 +49,7 @@ If file size is less than 5MB, file will be uploaded via regular PUT operation
 You can also manually upload chunks to AWS
 
 ```erlang
-1> {ok, Pid} = erlaws3:open_stream(<<"bucket">>, <<"region">>, <<"/aws_file_path">>, 10).
+1> {ok, Pid} = erlaws3:open_stream(<<"bucket">>, <<"region">>, <<"/aws_file_path">>, 10, [{<<"content-type">>, <<"image/jpeg">>}]).
 {ok,#Ref<0.2819056575.3481534465.64411>}
 2> erlaws3:upload_to_stream(Pid, <<"abc">>).
 ok
