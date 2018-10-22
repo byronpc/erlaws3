@@ -127,7 +127,8 @@ close_stream(ConnPid) ->
     {ok, #{status_code := 200, headers := Resp}} ->
       {<<"ETag">>, Etag} = lists:keyfind(<<"ETag">>, 1, Resp),
       {ok, Etag};
-    E -> E
+    {_, Error} ->
+      {error, Error}
   end.
 
 %% Utility function to spawn multiple process for uploading parts
