@@ -14,16 +14,19 @@ generate(Host, HttpVerb, CanonicalUri, CanonicalQueryString, AwsRegion, Scope) -
   Date = erlaws3_utils:get_date(),
   Timestamp = erlaws3_utils:get_timestamp(),
   AccessKey = application:get_env(erlaws3, access_key, <<>>),
-  Credential = <<AccessKey/binary, "/", Date/binary, "/", AwsRegion/binary, "/", Scope/binary, "/aws4_request">>,
-  Headers = [{<<"host">>, Host}, {<<"x-amz-date">>, Timestamp}],
-  SignedHeaders = <<"host;x-amz-date">>,
-  Signature = generate_signature(HttpVerb, CanonicalUri, CanonicalQueryString, Headers, AwsRegion, Scope, Date, Timestamp),
-  Authorization = <<"AWS4-HMAC-SHA256 ",
-    "Credential=", Credential/binary, ", ",
-    "SignedHeaders=", SignedHeaders/binary, ", ",
-    "Signature=", Signature/binary>>,
-  [
-    {<<"Authorization">>, Authorization},
+  Authorization = case AccessKey of
+    <<>> -> [];
+    _ ->
+      Credential = <<AccessKey/binary, "/", Date/binary, "/", AwsRegion/binary, "/", Scope/binary, "/aws4_request">>,
+      Headers = [{<<"host">>, Host}, {<<"x-amz-date">>, Timestamp}],
+      SignedHeaders = <<"host;x-amz-date">>,
+      Signature = generate_signature(HttpVerb, CanonicalUri, CanonicalQueryString, Headers, AwsRegion, Scope, Date, Timestamp),
+      [{<<"Authorization">>, <<"AWS4-HMAC-SHA256 ",
+        "Credential=", Credential/binary, ", ",
+        "SignedHeaders=", SignedHeaders/binary, ", ",
+        "Signature=", Signature/binary>>}]
+  end,
+  Authorization ++ [
     {<<"x-amz-content-sha256">>, ?PAYLOAD_HASH},
     {<<"x-amz-date">>, Timestamp}
   ].
