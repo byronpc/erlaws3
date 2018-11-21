@@ -7,28 +7,33 @@
 -export([generate/6]).
 -define(PAYLOAD_HASH, <<"UNSIGNED-PAYLOAD">>).
 
+-define(X_AMZ_SECURITY_TOKEN, <<"x-amz-security-token">>).
+
 %%====================================================================
 %% @doc Header Generator
 %%====================================================================
 generate(Host, HttpVerb, CanonicalUri, CanonicalQueryString, AwsRegion, Scope) ->
   Date = erlaws3_utils:get_date(),
   Timestamp = erlaws3_utils:get_timestamp(),
+  Token = case application:get_env(erlaws3, token, <<>>) of
+    <<>> -> 
+      SignedToken = <<>>,
+      [];
+    AwsToken -> 
+      SignedToken = <<";", ?X_AMZ_SECURITY_TOKEN/binary>>,
+      [{?X_AMZ_SECURITY_TOKEN, AwsToken}]
+  end,
   Authorization = case application:get_env(erlaws3, access_key, <<>>) of
     <<>> -> [];
     AccessKey ->
       Credential = <<AccessKey/binary, "/", Date/binary, "/", AwsRegion/binary, "/", Scope/binary, "/aws4_request">>,
-      Headers = [{<<"host">>, Host}, {<<"x-amz-date">>, Timestamp}],
-      SignedHeaders = <<"host;x-amz-date">>,
+      Headers = [{<<"host">>, Host}, {<<"x-amz-date">>, Timestamp}] ++ Token,
+      SignedHeaders = <<"host;x-amz-date", SignedToken/binary>>,
       Signature = generate_signature(HttpVerb, CanonicalUri, CanonicalQueryString, Headers, AwsRegion, Scope, Date, Timestamp),
       [{<<"Authorization">>, <<"AWS4-HMAC-SHA256 ",
         "Credential=", Credential/binary, ", ",
         "SignedHeaders=", SignedHeaders/binary, ", ",
         "Signature=", Signature/binary>>}]
-  end,
-  Token = case application:get_env(erlaws3, token, <<>>) of
-    <<>> -> [];
-    AwsToken -> [
-      {<<"x-amz-security-token">>, AwsToken}]
   end,
   Authorization ++ Token ++ [
     {<<"x-amz-content-sha256">>, ?PAYLOAD_HASH},
