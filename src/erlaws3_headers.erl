@@ -13,10 +13,9 @@
 generate(Host, HttpVerb, CanonicalUri, CanonicalQueryString, AwsRegion, Scope) ->
   Date = erlaws3_utils:get_date(),
   Timestamp = erlaws3_utils:get_timestamp(),
-  AccessKey = application:get_env(erlaws3, access_key, <<>>),
-  Authorization = case AccessKey of
+  Authorization = case application:get_env(erlaws3, access_key, <<>>) of
     <<>> -> [];
-    _ ->
+    AccessKey ->
       Credential = <<AccessKey/binary, "/", Date/binary, "/", AwsRegion/binary, "/", Scope/binary, "/aws4_request">>,
       Headers = [{<<"host">>, Host}, {<<"x-amz-date">>, Timestamp}],
       SignedHeaders = <<"host;x-amz-date">>,
@@ -26,7 +25,12 @@ generate(Host, HttpVerb, CanonicalUri, CanonicalQueryString, AwsRegion, Scope) -
         "SignedHeaders=", SignedHeaders/binary, ", ",
         "Signature=", Signature/binary>>}]
   end,
-  Authorization ++ [
+  Token = case application:get_env(erlaws3, token, <<>>) of
+    <<>> -> [];
+    AwsToken -> [
+      {<<"x-amz-security-token">>, AwsToken}]
+  end,
+  Authorization ++ Token ++ [
     {<<"x-amz-content-sha256">>, ?PAYLOAD_HASH},
     {<<"x-amz-date">>, Timestamp}
   ].
