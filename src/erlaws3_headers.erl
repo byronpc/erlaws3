@@ -54,10 +54,10 @@ calc_authorization_header(AccessKey, SignedHeaders, HttpVerb, CanonicalUri, Cano
 calc_signed_headers_value(SignedHeaders) ->
   calc_signed_headers_value_(SignedHeaders, <<>>).
 
-calc_signed_headers_value_([{H,_}], <<>>) when is_binary(H) -> 
-  <<H/binary>>;
+calc_signed_headers_value_([{H,_}], Buf) when is_binary(H) -> 
+  <<Buf/binary, H/binary>>;
 calc_signed_headers_value_([{H,_}|R], Buf) when is_binary(H) ->
-  calc_signed_headers_value_(R, <<Buf/binary, ";", H/binary>>);
+  calc_signed_headers_value_(R, <<Buf/binary, H/binary, ";">>);
 calc_signed_headers_value_(_, Buf) -> 
   Buf.
 
@@ -112,11 +112,15 @@ generate_signing_key(Date, AwsRegion, Scope) ->
   ScopeKey = crypto:hmac(sha256, RegionKey, Scope),
   crypto:hmac(sha256, ScopeKey, <<"aws4_request">>).
 
--ifdef(TEST).
 
+%% Testing Section
 
-
+-ifdef(EUNIT).
 -include_lib("eunit/include/eunit.hrl").
 
+generate_test() ->
+  application:set_env(erlaws3, access_key, <<"FAKE_KEY_TEST">>),
+  application:set_env(erlaws3, token, <<"FAKE_XI_TEST=">>),
+  ?debugFmt("Result: ~p ~n", [generate(<<"erlaws3.s2.all-save.amazonia.com">>, <<"PUT">>, <<"erlaws3.s2.all-save.amazonia.com">>, <<"erlaws3.s2.all-save.amazonia.com">>, <<"eu-central-1">>, <<"s2">>, [{<<"x-amz-acl">>, <<"public-read">>}])]).
 
 -endif.
