@@ -6,7 +6,9 @@
 -module(erlaws3_utils).
 -export([
   get_date/0,
+  get_date/1,
   get_timestamp/0,
+  get_timestamp/1,
   sha256_to_hex/1,
   http_open/2,
   http_close/1,
@@ -25,11 +27,15 @@
 %% @doc Utilities
 %%====================================================================
 get_date() ->
-  {Y,M,D} = date(),
+  get_date(calendar:universal_time()).
+
+get_date({{Y,M,D},_}) ->
   list_to_binary(io_lib:format("~4..0w~2..0w~2..0w", [Y,M,D])).
 
 get_timestamp() ->
-  {{Y,M,D},{H,Mi,S}}   = calendar:universal_time(),
+  get_timestamp(calendar:universal_time()).
+
+get_timestamp({{Y,M,D},{H,Mi,S}}) ->
   list_to_binary(io_lib:format("~4..0w~2..0w~2..0wT~2..0w~2..0w~2..0wZ", [Y,M,D,H,Mi,S])).
 
 sha256_to_hex(<<Bin:256/big-unsigned-integer>>) ->

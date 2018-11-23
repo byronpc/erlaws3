@@ -150,5 +150,5 @@ delete_object(ConnPid, BucketUrl, ObjectName, AwsRegion) ->
 %%====================================================================
 manual_stream_upload(ConnPid, BucketUrl, ObjectName, AwsRegion, ContentSize, ExtraHeaders) ->
   Headers = ExtraHeaders ++ [ {<<"content-length">>, ContentSize} |
-  erlaws3_headers:generate(BucketUrl, <<"PUT">>, ObjectName, <<>>, AwsRegion, ?SCOPE)],
+  erlaws3_headers:generate(BucketUrl, <<"PUT">>, ObjectName, <<>>, AwsRegion, ?SCOPE, ExtraHeaders)],
   hackney:send_request(ConnPid, {put, ObjectName, Headers, stream}).
