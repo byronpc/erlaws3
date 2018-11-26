@@ -25,7 +25,9 @@ generate(Host, HttpVerb, CanonicalUri, CanonicalQueryString, AwsRegion, Scope) -
   generate(Host, HttpVerb, CanonicalUri, CanonicalQueryString, AwsRegion, Scope, []).
 
 generate(Host, HttpVerb, CanonicalUri, CanonicalQueryString, AwsRegion, Scope, ExtraHeaders) ->
-  Now = calendar:universal_time(),
+  generate(Host, HttpVerb, CanonicalUri, CanonicalQueryString, AwsRegion, Scope, ExtraHeaders, calendar:universal_time()).
+
+generate(Host, HttpVerb, CanonicalUri, CanonicalQueryString, AwsRegion, Scope, ExtraHeaders, Now) ->
   Date = erlaws3_utils:get_date(Now),
   Timestamp = erlaws3_utils:get_timestamp(Now),
   BaseHeaders = [ {?HOST, Host},
@@ -112,15 +114,71 @@ generate_signing_key(Date, AwsRegion, Scope) ->
   ScopeKey = crypto:hmac(sha256, RegionKey, Scope),
   crypto:hmac(sha256, ScopeKey, <<"aws4_request">>).
 
-
 %% Testing Section
 
 -ifdef(EUNIT).
 -include_lib("eunit/include/eunit.hrl").
 
-generate_test() ->
+% Test with a fixed Time, Key and Params MUST compose always same Auth Headers
+generate_times_test() ->
   application:set_env(erlaws3, access_key, <<"FAKE_KEY_TEST">>),
   application:set_env(erlaws3, token, <<"FAKE_XI_TEST=">>),
-  ?debugFmt("Result: ~p ~n", [generate(<<"erlaws3.s2.all-save.amazonia.com">>, <<"PUT">>, <<"erlaws3.s2.all-save.amazonia.com">>, <<"erlaws3.s2.all-save.amazonia.com">>, <<"eu-central-1">>, <<"s2">>, [{<<"x-amz-acl">>, <<"public-read">>}])]).
+  BaseFakeDate = calendar:universal_time(),
+  ExtraHeaders = [{<<"x-amz-acl">>, <<"public-read">>}],
+  TestHeaders = generate(<<"erlaws3.s2.all-save.amazonia.com">>, 
+                          <<"PUT">>, <<"erlaws3.s2.all-save.amazonia.com">>,
+                          <<"erlaws3.s2.all-save.amazonia.com">>, 
+                          <<"eu-robot-1">>, 
+                          <<"s2">>, 
+                          ExtraHeaders, 
+                          BaseFakeDate),
+  TestHeaders2 = generate(<<"erlaws3.s2.all-save.amazonia.com">>, 
+                          <<"PUT">>, <<"erlaws3.s2.all-save.amazonia.com">>, 
+                          <<"erlaws3.s2.all-save.amazonia.com">>, 
+                          <<"eu-robot-1">>, 
+                          <<"s2">>, 
+                          ExtraHeaders, 
+                          BaseFakeDate),
+  ?debugFmt("Result: ~p ~n", [TestHeaders]),
+  ?assert(length(TestHeaders) == 5),
+  ?assert(TestHeaders == TestHeaders2).
+
+% Test with a fixed Time, Key and Params MUST compose always same Auth Headers
+generate_extra_headers_test() ->
+  application:set_env(erlaws3, access_key, <<"FAKE_KEY_TEST">>),
+  application:set_env(erlaws3, token, <<"FAKE_XI_TEST=">>),
+  BaseFakeDate = calendar:universal_time(),
+  FakeUnsigned = <<"FakeUnsigned">>,
+  FakeSigned = <<"x-amz-FakeSigned">>,
+  ExtraHeaders = [{<<"x-amz-acl">>, <<"public-read">>}, {FakeSigned, <<"456">>}],
+  ExtraHeaders2 = [{<<"x-amz-acl">>, <<"public-read">>}, {FakeUnsigned, <<"123">>}, {FakeSigned, <<"456">>}],
+  ?debugFmt("Extra Header Filter: ~p ~n", [[ H || {?X_AMZ_PREFIX_MATCH, _} = H <- ExtraHeaders]]),
+  TestHeaders = generate(<<"erlaws3.s2.all-save.amazonia.com">>, 
+                          <<"PUT">>, <<"erlaws3.s2.all-save.amazonia.com">>,
+                          <<"erlaws3.s2.all-save.amazonia.com">>, 
+                          <<"eu-robot-1">>, 
+                          <<"s2">>, 
+                          ExtraHeaders, 
+                          BaseFakeDate),
+  TestHeaders2 = generate(<<"erlaws3.s2.all-save.amazonia.com">>, 
+                          <<"PUT">>, <<"erlaws3.s2.all-save.amazonia.com">>, 
+                          <<"erlaws3.s2.all-save.amazonia.com">>, 
+                          <<"eu-robot-1">>, 
+                          <<"s2">>, 
+                          ExtraHeaders2, 
+                          BaseFakeDate),
+  ?debugFmt("Test Header: ~p ~n", [TestHeaders]),
+  ?debugFmt("TestHeaders2: ~p ~n", [TestHeaders]),
+
+  AuthHeader = proplists:get_value(<<"Authorization">>, TestHeaders, <<>>),
+  AuthHeader2 = proplists:get_value(<<"Authorization">>, TestHeaders2, <<>>),
+
+  ?assert(string:find(AuthHeader, FakeSigned) /= nomatch),
+  ?assert(string:find(AuthHeader2, FakeSigned) /= nomatch),
+  ?assert(string:find(AuthHeader2, FakeUnsigned) == nomatch),
+
+  ?assert(length(TestHeaders) == 5),
+  ?assert(length(TestHeaders2) == 5),
+  ?assert(TestHeaders == TestHeaders2).
 
 -endif.
