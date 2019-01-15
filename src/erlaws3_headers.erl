@@ -4,19 +4,34 @@
 %% @end
 %%%-------------------------------------------------------------------
 -module(erlaws3_headers).
--export([generate/6]).
+-export([generate/4, generate/6, generate/7]).
 -define(PAYLOAD_HASH, <<"UNSIGNED-PAYLOAD">>).
+-define(BUCKET_URL(Bucket), <<Bucket/binary, ".s3.amazonaws.com">>).
 
 %%====================================================================
 %% @doc Header Generator
 %%====================================================================
+generate(HttpVerb, CanonicalUri, Scope, ExtraHeaders) ->
+  Region = application:get_env(erlaws3, default_region, <<>>),
+  Bucket = application:get_env(erlaws3, default_bucket, <<>>),
+  generate(?BUCKET_URL(Bucket), HttpVerb, CanonicalUri, <<>>, Region, Scope, ExtraHeaders).
+
 generate(Host, HttpVerb, CanonicalUri, CanonicalQueryString, AwsRegion, Scope) ->
+  generate(Host, HttpVerb, CanonicalUri, CanonicalQueryString, AwsRegion, Scope, []).
+
+generate(Host, HttpVerb, CanonicalUri, CanonicalQueryString, AwsRegion, Scope, ExtraHeaders) ->
   Date = erlaws3_utils:get_date(),
   Timestamp = erlaws3_utils:get_timestamp(),
   AccessKey = application:get_env(erlaws3, access_key, <<>>),
   Credential = <<AccessKey/binary, "/", Date/binary, "/", AwsRegion/binary, "/", Scope/binary, "/aws4_request">>,
-  Headers = [{<<"host">>, Host}, {<<"x-amz-date">>, Timestamp}],
-  SignedHeaders = <<"host;x-amz-date">>,
+  Headers = lists:sort([{<<"host">>, Host}, {<<"x-amz-date">>, Timestamp} | ExtraHeaders]),
+  SignedHeaders = lists:foldl(fun({Key, _}, Acc) ->
+    if Acc == <<>> ->
+      Key;
+    true ->
+      <<Acc/binary, ";", Key/binary>>
+    end
+  end, <<>>, Headers),
   Signature = generate_signature(HttpVerb, CanonicalUri, CanonicalQueryString, Headers, AwsRegion, Scope, Date, Timestamp),
   Authorization = <<"AWS4-HMAC-SHA256 ",
     "Credential=", Credential/binary, ", ",
@@ -26,7 +41,7 @@ generate(Host, HttpVerb, CanonicalUri, CanonicalQueryString, AwsRegion, Scope) -
     {<<"Authorization">>, Authorization},
     {<<"x-amz-content-sha256">>, ?PAYLOAD_HASH},
     {<<"x-amz-date">>, Timestamp}
-  ].
+  | ExtraHeaders].
 
 %%====================================================================
 %% @doc Signature
