@@ -20,8 +20,8 @@ generate(Host, HttpVerb, CanonicalUri, CanonicalQueryString, AwsRegion, Scope) -
   generate(Host, HttpVerb, CanonicalUri, CanonicalQueryString, AwsRegion, Scope, []).
 
 generate(Host, HttpVerb, CanonicalUri, CanonicalQueryString, AwsRegion, Scope, ExtraHeaders) ->
-  Date = erlaws3_utils:get_date(),
   Timestamp = erlaws3_utils:get_timestamp(),
+  [Date, _] = binary:split(Timestamp, <<"T">>),
   AccessKey = application:get_env(erlaws3, access_key, <<>>),
   Credential = <<AccessKey/binary, "/", Date/binary, "/", AwsRegion/binary, "/", Scope/binary, "/aws4_request">>,
   Headers = lists:sort([{<<"host">>, Host}, {<<"x-amz-date">>, Timestamp} | ExtraHeaders]),
