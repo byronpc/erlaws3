@@ -26,8 +26,8 @@ single_upload(ConnPid, BucketUrl, ObjectName, AwsRegion, File, ExtraHeaders) ->
 
 single_upload(ConnPid, BucketUrl, ObjectName, AwsRegion, File, ExtraHeaders, Retry) ->
   MaxRetry = application:get_env(erlaws3, max_retry, 3),
-  Headers = erlaws3_headers:generate(BucketUrl, <<"PUT">>, ObjectName, <<>>, AwsRegion, ?SCOPE),
-  Result = erlaws3_utils:http_stream(ConnPid, put, ObjectName, Headers ++ ExtraHeaders, File),
+  Headers = erlaws3_headers:generate(BucketUrl, <<"PUT">>, ObjectName, <<>>, AwsRegion, ?SCOPE, ExtraHeaders),
+  Result = erlaws3_utils:http_stream(ConnPid, put, ObjectName, Headers, File),
   case Result of
     {ok, #{status_code := 200, headers := Resp}} ->
       {<<"ETag">>, Etag} = lists:keyfind(<<"ETag">>, 1, Resp),
@@ -149,6 +149,6 @@ delete_object(ConnPid, BucketUrl, ObjectName, AwsRegion) ->
 %% @doc Manual Stream Upload
 %%====================================================================
 manual_stream_upload(ConnPid, BucketUrl, ObjectName, AwsRegion, ContentSize, ExtraHeaders) ->
-  Headers = ExtraHeaders ++ [ {<<"content-length">>, ContentSize} |
-  erlaws3_headers:generate(BucketUrl, <<"PUT">>, ObjectName, <<>>, AwsRegion, ?SCOPE)],
+  ExtraHeaders1 =  [{<<"content-length">>, ContentSize} | ExtraHeaders],
+  Headers = erlaws3_headers:generate(BucketUrl, <<"PUT">>, ObjectName, <<>>, AwsRegion, ?SCOPE, ExtraHeaders1),
   hackney:send_request(ConnPid, {put, ObjectName, Headers, stream}).

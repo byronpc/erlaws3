@@ -59,8 +59,13 @@ generate_canonical_request(HttpVerb, CanonicalUri, CanonicalQueryString, Headers
   Headers1 = lists:sort(Headers),
   <<_:1/binary, CanonicalHeaders/binary>> =
     lists:foldl(fun({N, V}, Acc) ->
+      V2 = if is_integer(V) ->
+        integer_to_binary(V);
+      true ->
+        string:trim(V)
+      end,
       <<Acc/binary, "\n",
-      (string:lowercase(N))/binary, ":", (string:trim(V))/binary>>
+      (string:lowercase(N))/binary, ":", V2/binary>>
     end, <<>>, Headers1),
   <<_:1/binary, SignedHeaders/binary>> =
     lists:foldl(fun({N, _V}, Acc) ->
