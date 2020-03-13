@@ -55,8 +55,10 @@ http_delete(ConnPid, Path, Headers) ->
 
 http_stream(ConnPid, Method, Path, Headers, File) ->
   FileSize = filelib:file_size(File),
-  {ok, Fid} = file:open(File, [read]),
-  http_stream(ConnPid, Method, Path, Headers, Fid, 0, FileSize).
+  case file:open(File, [read]) of
+    {ok, Fid} -> http_stream(ConnPid, Method, Path, Headers, Fid, 0, FileSize);
+    {error, Error} -> {error, Error}
+  end.
 
 http_stream(ConnPid, Method, Path, Headers, Fid, Offset, ContentSize) ->
   ChunkSize = application:get_env(erlaws3, chunk_size, ?DEFAULT_CHUNK_SIZE),

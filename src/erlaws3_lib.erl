@@ -32,13 +32,14 @@ single_upload(ConnPid, BucketUrl, ObjectName, AwsRegion, File, ExtraHeaders, Ret
     {ok, #{status_code := 200, headers := Resp}} ->
       {<<"ETag">>, Etag} = lists:keyfind(<<"ETag">>, 1, Resp),
       {ok, Etag};
+    {ok, Error} ->
+      {error, Error};
     {error, Error} ->
       if Retry < MaxRetry ->
         single_upload(ConnPid, BucketUrl, ObjectName, AwsRegion, File, ExtraHeaders, Retry + 1);
       true ->
         {error, Error}
-      end;
-    E -> E % unhandled errors if any
+      end
   end.
 
 %%====================================================================
@@ -85,6 +86,8 @@ upload_part(BucketUrl, ObjectName, AwsRegion, UploadId, PartNumber, Fid, Offset,
     {ok, #{status_code := 200, headers := Resp}} ->
       {<<"ETag">>, Etag} = lists:keyfind(<<"ETag">>, 1, Resp),
       {ok, Etag};
+    {ok, Error} ->
+      {error, Error};
     {_, Error} ->
       erlaws3_utils:http_close(ConnPid),
       if Retry < MaxRetry ->
