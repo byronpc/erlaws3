@@ -50,7 +50,7 @@ generate_signature(HttpVerb, CanonicalUri, CanonicalQueryString, Headers, AwsReg
   CanonicalRequest = generate_canonical_request(HttpVerb, CanonicalUri, CanonicalQueryString, Headers),
   StringToSign = generate_string_to_sign(Date, Timestamp, AwsRegion, Scope, CanonicalRequest),
   SigningKey = generate_signing_key(Date, AwsRegion, Scope),
-  erlaws3_utils:sha256_to_hex(crypto:hmac(sha256, SigningKey, StringToSign)).
+  erlaws3_utils:sha256_to_hex(crypto:mac(hmac, sha256, SigningKey, StringToSign)).
 
 %%====================================================================
 %% @doc Canonical Request
@@ -94,7 +94,7 @@ generate_string_to_sign(Date, Timestamp, AwsRegion, Scope, CanonicalRequest) ->
 %%====================================================================
 generate_signing_key(Date, AwsRegion, Scope) ->
   SecretKey = application:get_env(erlaws3, secret_key, <<>>),
-  DateKey = crypto:hmac(sha256, <<"AWS4", SecretKey/binary>>, Date),
-  RegionKey = crypto:hmac(sha256, DateKey, AwsRegion),
-  ScopeKey = crypto:hmac(sha256, RegionKey, Scope),
-  crypto:hmac(sha256, ScopeKey, <<"aws4_request">>).
+  DateKey = crypto:mac(hmac, sha256, <<"AWS4", SecretKey/binary>>, Date),
+  RegionKey = crypto:mac(hmac, sha256, DateKey, AwsRegion),
+  ScopeKey = crypto:mac(hmac, sha256, RegionKey, Scope),
+  crypto:mac(hmac, sha256, ScopeKey, <<"aws4_request">>).
