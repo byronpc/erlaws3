@@ -16,7 +16,8 @@
   http_stream/5,
   http_stream/7,
   http_delete/3,
-  http_response/2
+  http_response/2,
+  bucket_url/1
 ]).
 
 -define(DEFAULT_CHUNK_SIZE, 1048576).
@@ -96,3 +97,7 @@ chunk_send_body(ConnPid, Fid, ChunkSize, Offset, ContentSize) ->
     ok = hackney:send_body(ConnPid, Bytes),
     chunk_send_body(ConnPid, Fid, ChunkSize, NextOffset, NextContentSize)
   end.
+
+bucket_url(Bucket) ->
+  {ok, Host} = application:get_env(erlaws3, s3_host),
+  <<Bucket/binary, ".", Host/binary>>.

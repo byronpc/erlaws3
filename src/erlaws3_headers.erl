@@ -6,7 +6,6 @@
 -module(erlaws3_headers).
 -export([generate/4, generate/6, generate/7]).
 -define(PAYLOAD_HASH, <<"UNSIGNED-PAYLOAD">>).
--define(BUCKET_URL(Bucket), <<Bucket/binary, ".s3.amazonaws.com">>).
 
 %%====================================================================
 %% @doc Header Generator
@@ -14,7 +13,7 @@
 generate(HttpVerb, CanonicalUri, Scope, ExtraHeaders) ->
   Region = application:get_env(erlaws3, default_region, <<>>),
   Bucket = application:get_env(erlaws3, default_bucket, <<>>),
-  generate(?BUCKET_URL(Bucket), HttpVerb, CanonicalUri, <<>>, Region, Scope, ExtraHeaders).
+  generate(erlaws3_utils:bucket_url(Bucket), HttpVerb, CanonicalUri, <<>>, Region, Scope, ExtraHeaders).
 
 generate(Host, HttpVerb, CanonicalUri, CanonicalQueryString, AwsRegion, Scope) ->
   generate(Host, HttpVerb, CanonicalUri, CanonicalQueryString, AwsRegion, Scope, []).

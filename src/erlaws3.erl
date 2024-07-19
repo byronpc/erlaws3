@@ -9,7 +9,6 @@
 % Stream upload
 -export([open_stream/3, open_stream/5, upload_to_stream/2, close_stream/1]).
 
--define(BUCKET_URL(Bucket), <<Bucket/binary, ".s3.amazonaws.com">>).
 -define(MIN_PART_SIZE, 5242880). % S3 Minumum Size for Multipart Upload
 
 -type etag() :: bitstring().
@@ -27,7 +26,7 @@
 
 -spec upload(bitstring(), bitstring(), bitstring(), bitstring(), list(tuple())) -> {ok, etag()} | {error, any()}.
 upload(Bucket, AwsRegion, ObjectName, File, ExtraHeaders) ->
-  BucketUrl = ?BUCKET_URL(Bucket),
+  BucketUrl = erlaws3_utils:bucket_url(Bucket),
   case erlaws3_utils:http_open(BucketUrl, 443) of
     {ok, ConnPid} ->
       Result = upload(ConnPid, Bucket, AwsRegion, ObjectName, File, ExtraHeaders),
@@ -38,7 +37,7 @@ upload(Bucket, AwsRegion, ObjectName, File, ExtraHeaders) ->
 
 -spec upload(gun_pid(), bitstring(), bitstring(), bitstring(), bitstring(), list(tuple())) -> {ok, etag()} | {error, any()}.
 upload(ConnPid, Bucket, AwsRegion, ObjectName, File, ExtraHeaders) ->
-  BucketUrl = ?BUCKET_URL(Bucket),
+  BucketUrl = erlaws3_utils:bucket_url(Bucket),
   case filelib:file_size(File) of
 
     % if file is more than 5mb, multipart upload the file
@@ -73,7 +72,7 @@ delete(ObjectName) ->
 
 -spec delete(bitstring(), bitstring(), bitstring()) -> {ok, true} | {error, any()}.
 delete(Bucket, AwsRegion, ObjectName) ->
-  BucketUrl = ?BUCKET_URL(Bucket),
+  BucketUrl = erlaws3_utils:bucket_url(Bucket),
   case erlaws3_utils:http_open(BucketUrl, 443) of
     {ok, ConnPid} ->
       Result = delete(ConnPid, Bucket, AwsRegion, ObjectName),
@@ -84,7 +83,7 @@ delete(Bucket, AwsRegion, ObjectName) ->
 
 -spec delete(gun_pid(), bitstring(), bitstring(), bitstring()) -> {ok, true} | {error, any()}.
 delete(ConnPid, Bucket, AwsRegion, ObjectName) ->
-  BucketUrl = ?BUCKET_URL(Bucket),
+  BucketUrl = erlaws3_utils:bucket_url(Bucket),
   erlaws3_lib:delete_object(ConnPid, BucketUrl, ObjectName, AwsRegion).
 
 %%====================================================================
@@ -99,7 +98,7 @@ open_stream(ObjectName, ContentSize, ExtraHeaders) ->
 
 -spec open_stream(bitstring(), bitstring(), bitstring(), integer(), list(tuple())) -> {ok, pid()} | {error, any()}.
 open_stream(Bucket, AwsRegion, ObjectName, ContentSize, ExtraHeaders) ->
-  BucketUrl = ?BUCKET_URL(Bucket),
+  BucketUrl = erlaws3_utils:bucket_url(Bucket),
   case erlaws3_utils:http_open(BucketUrl, 443) of
     {ok, ConnPid} ->
       erlaws3_lib:manual_stream_upload(ConnPid, BucketUrl, ObjectName, AwsRegion, ContentSize, ExtraHeaders);
