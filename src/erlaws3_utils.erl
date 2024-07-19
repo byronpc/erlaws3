@@ -99,5 +99,5 @@ chunk_send_body(ConnPid, Fid, ChunkSize, Offset, ContentSize) ->
   end.
 
 bucket_url(Bucket) ->
-  {ok, Host} = application:get_env(erlaws3, s3_host),
+  Host = application:get_env(erlaws3, s3_host, <<"s3.amazonaws.com">>),
   <<Bucket/binary, ".", Host/binary>>.
